@@ -7,7 +7,10 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /run/podman/podman.sock:/var/run/podman/podman.sock
+      - /:/host/root:ro
+      - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/podman/podman.sock
+    environment:
+      - HOST_ROOT_PATH=/host/root
     restart: unless-stopped
     security_opt:
       - label=disable

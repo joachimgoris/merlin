@@ -13,6 +13,7 @@ builder.Services.AddSignalR()
 // Configuration
 var hostProcPath = builder.Configuration["HOST_PROC_PATH"] ?? "/proc";
 var hostSysPath = builder.Configuration["HOST_SYS_PATH"] ?? "/sys";
+var hostRootPath = builder.Configuration["HOST_ROOT_PATH"];
 var podmanSocketPath = builder.Configuration["PODMAN_SOCKET_PATH"] ?? "/var/run/podman/podman.sock";
 
 // Fall back to real /proc and /sys on Linux dev machines
@@ -21,7 +22,7 @@ if (!Directory.Exists(hostProcPath) && Directory.Exists("/proc"))
 if (!Directory.Exists(hostSysPath) && Directory.Exists("/sys"))
     hostSysPath = "/sys";
 
-builder.Services.AddSingleton(new MetricsCollectorOptions(hostProcPath, hostSysPath));
+builder.Services.AddSingleton(new MetricsCollectorOptions(hostProcPath, hostSysPath, hostRootPath));
 builder.Services.AddSingleton<ISystemMetricsCollector, LinuxMetricsCollector>();
 builder.Services.AddSingleton<MetricsHistory>();
 builder.Services.AddHostedService<MetricsBackgroundService>();

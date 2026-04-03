@@ -191,7 +191,10 @@ public sealed class LinuxMetricsCollector(
             var currentDiskSectors = ParseDiskStats(diskStatsLines);
 
             var pseudoFs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { "tmpfs", "proc", "sysfs", "devtmpfs", "cgroup", "cgroup2", "overlay", "devpts", "mqueue", "hugetlbfs", "debugfs", "securityfs", "pstore", "bpf", "tracefs", "fusectl", "configfs", "efivarfs" };
+                { "tmpfs", "proc", "sysfs", "devtmpfs", "cgroup", "cgroup2", "overlay", "devpts", "mqueue", "hugetlbfs", "debugfs", "securityfs", "pstore", "bpf", "tracefs", "fusectl", "configfs", "efivarfs", "squashfs", "fuse.snapfuse" };
+
+            // Track seen devices to avoid duplicate mounts for the same partition
+            var seenDevices = new HashSet<string>();
 
             foreach (var line in mountLines)
             {
@@ -203,12 +206,17 @@ public sealed class LinuxMetricsCollector(
                 var fsType = parts[2];
 
                 if (pseudoFs.Contains(fsType)) continue;
-                if (mountPoint.StartsWith("/host/proc") || mountPoint.StartsWith("/host/sys")) continue;
-                if (!mountPoint.StartsWith('/')) continue;
+                if (!device.StartsWith("/dev/")) continue;
+                if (!seenDevices.Add(device)) continue;
 
                 try
                 {
-                    var driveInfo = new DriveInfo(mountPoint);
+                    // When running in a container with host root mounted, stat via the host root path
+                    var statPath = options.HostRootPath is not null
+                        ? Path.Combine(options.HostRootPath, mountPoint.TrimStart('/'))
+                        : mountPoint;
+
+                    var driveInfo = new DriveInfo(statPath);
                     if (!driveInfo.IsReady || driveInfo.TotalSize == 0) continue;
 
                     var deviceName = Path.GetFileName(device);
