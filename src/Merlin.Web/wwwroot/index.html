@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Merlin</title>
+  <meta name="description" content="System monitoring dashboard">
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header__brand">
+      <svg class="header__icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <path d="M16 4C16 4 8 8 8 16C8 20 10 24 16 28C22 24 24 20 24 16C24 8 16 4 16 4Z" fill="oklch(75% 0.18 250)" opacity="0.2"/>
+        <path d="M16 6L12 12L8 16C8 20 10 24 16 28" stroke="oklch(75% 0.18 250)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        <path d="M16 6L20 12L24 16C24 20 22 24 16 28" stroke="oklch(72% 0.2 310)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        <circle cx="16" cy="14" r="2" fill="oklch(75% 0.18 250)"/>
+      </svg>
+      <h1 class="header__title">Merlin</h1>
+    </div>
+    <div class="header__status">
+      <span class="connection-dot connection-dot--disconnected" id="connection-dot"></span>
+      <span id="connection-text">Connecting...</span>
+      <span id="uptime" style="margin-left: var(--space-4)"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- System metrics grid -->
+    <div class="metrics-grid">
+      <!-- CPU -->
+      <section class="metric-card" style="--glow-color: var(--color-accent-cpu)" aria-labelledby="cpu-heading">
+        <div class="metric-card__header">
+          <span class="metric-card__label" id="cpu-heading">CPU</span>
+          <span class="metric-card__sub" id="cpu-freq"></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-6)">
+          <svg class="gauge-ring" viewBox="0 0 140 140">
+            <circle class="gauge-ring__track" cx="70" cy="70" r="60"/>
+            <circle class="gauge-ring__fill" id="cpu-gauge-fill" cx="70" cy="70" r="60"
+                    stroke="var(--color-accent-cpu)"
+                    stroke-dasharray="377" stroke-dashoffset="377"/>
+            <text class="gauge-ring__text" x="70" y="70" id="cpu-gauge-text">0%</text>
+          </svg>
+          <div style="flex: 1">
+            <div class="metric-card__sub">
+              Load: <span id="cpu-load" style="color: var(--color-text)">0.00 / 0.00 / 0.00</span>
+            </div>
+            <canvas class="sparkline" id="cpu-sparkline"></canvas>
+          </div>
+        </div>
+        <div class="core-grid" id="cpu-cores"></div>
+      </section>
+
+      <!-- Memory -->
+      <section class="metric-card" style="--glow-color: var(--color-accent-mem)" aria-labelledby="mem-heading">
+        <div class="metric-card__header">
+          <span class="metric-card__label" id="mem-heading">Memory</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-6)">
+          <svg class="gauge-ring" viewBox="0 0 140 140">
+            <circle class="gauge-ring__track" cx="70" cy="70" r="60"/>
+            <circle class="gauge-ring__fill" id="mem-gauge-fill" cx="70" cy="70" r="60"
+                    stroke="var(--color-accent-mem)"
+                    stroke-dasharray="377" stroke-dashoffset="377"/>
+            <text class="gauge-ring__text" x="70" y="70" id="mem-gauge-text">0%</text>
+          </svg>
+          <div style="flex: 1">
+            <div class="metric-card__sub">
+              <span id="mem-used">0 GB</span> / <span id="mem-total">0 GB</span>
+            </div>
+            <div class="metric-card__sub" style="margin-top: var(--space-2)">
+              Swap: <span id="swap-usage" style="color: var(--color-text)">0 / 0 GB</span>
+            </div>
+            <canvas class="sparkline" id="mem-sparkline"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Disk -->
+      <section class="metric-card" style="--glow-color: var(--color-accent-disk)" aria-labelledby="disk-heading">
+        <div class="metric-card__header">
+          <span class="metric-card__label" id="disk-heading">Disk</span>
+        </div>
+        <div id="disk-mounts"></div>
+      </section>
+
+      <!-- Network -->
+      <section class="metric-card" style="--glow-color: var(--color-accent-net)" aria-labelledby="net-heading">
+        <div class="metric-card__header">
+          <span class="metric-card__label" id="net-heading">Network</span>
+          <span class="metric-card__sub" id="net-rates"></span>
+        </div>
+        <canvas class="network-chart" id="net-chart"></canvas>
+      </section>
+
+      <!-- Temperature -->
+      <section class="metric-card section-full" style="--glow-color: var(--color-accent-temp); display: none" id="temp-section" aria-labelledby="temp-heading">
+        <div class="metric-card__header">
+          <span class="metric-card__label" id="temp-heading">Temperature</span>
+        </div>
+        <div id="temp-sensors"></div>
+      </section>
+    </div>
+
+    <!-- Containers -->
+    <section class="containers-section" aria-labelledby="containers-heading">
+      <div class="containers-section__header">
+        <h2 class="containers-section__title" id="containers-heading">Containers</h2>
+        <span class="metric-card__sub" id="container-count"></span>
+      </div>
+      <div class="container-grid" id="container-grid"></div>
+      <div class="empty-state" id="container-empty" style="display: none">
+        No containers found. Is the Podman socket mounted?
+      </div>
+    </section>
+  </main>
+
+  <!-- Container detail drawer -->
+  <div class="overlay" id="drawer-overlay"></div>
+  <aside class="detail-drawer" id="detail-drawer" aria-label="Container details">
+    <div class="detail-drawer__header">
+      <div>
+        <h3 id="drawer-name" style="font-weight: 600"></h3>
+        <div id="drawer-image" style="font-size: var(--text-xs); color: var(--color-text-muted); font-family: var(--font-mono); margin-top: var(--space-1)"></div>
+      </div>
+      <button class="detail-drawer__close" id="drawer-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="detail-drawer__actions" id="drawer-actions"></div>
+    <div class="detail-drawer__logs" id="drawer-logs"></div>
+  </aside>
+
+  <!-- Container card template -->
+  <template id="container-card-template">
+    <article class="container-card" data-container-id="">
+      <div class="container-card__header">
+        <span class="status-dot"></span>
+        <span class="container-card__name"></span>
+      </div>
+      <div class="container-card__image"></div>
+      <div class="container-card__stats">
+        <div>
+          <div class="container-card__stat-label">CPU</div>
+          <div class="container-card__stat-value" data-stat="cpu">0%</div>
+        </div>
+        <div>
+          <div class="container-card__stat-label">Memory</div>
+          <div class="container-card__stat-value" data-stat="mem">0%</div>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

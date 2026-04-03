@@ -1,0 +1,13 @@
+services:
+  merlin:
+    build: .
+    container_name: merlin
+    ports:
+      - "5050:5050"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /run/podman/podman.sock:/var/run/podman/podman.sock
+    restart: unless-stopped
+    security_opt:
+      - label=disable
