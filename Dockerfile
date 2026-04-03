@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY Merlin.sln .
+COPY Merlin.slnx .
 COPY src/Merlin.Web/Merlin.Web.csproj src/Merlin.Web/
 RUN dotnet restore src/Merlin.Web/Merlin.Web.csproj
 
