@@ -8,7 +8,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/host/root:ro
-      - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/podman/podman.sock
+      - /run/podman/podman.sock:/var/run/podman/podman.sock
     environment:
       - HOST_ROOT_PATH=/host/root
     restart: unless-stopped

@@ -20,7 +20,31 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     public PodmanContainerService(ContainerServiceOptions options, ILogger<PodmanContainerService> logger)
     {
         _logger = logger;
-        _socketAvailable = File.Exists(options.SocketPath);
+        // File.Exists returns false for Unix domain sockets; check via filesystem entry instead
+        try
+        {
+            var info = new FileInfo(options.SocketPath);
+            _socketAvailable = info.Exists || Directory.GetParent(options.SocketPath)?.GetFiles(Path.GetFileName(options.SocketPath)).Length > 0;
+        }
+        catch
+        {
+            _socketAvailable = false;
+        }
+
+        // Final fallback: try to actually connect
+        if (!_socketAvailable)
+        {
+            try
+            {
+                using var testSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                testSocket.Connect(new UnixDomainSocketEndPoint(options.SocketPath));
+                _socketAvailable = true;
+            }
+            catch
+            {
+                _socketAvailable = false;
+            }
+        }
 
         if (!_socketAvailable)
         {
