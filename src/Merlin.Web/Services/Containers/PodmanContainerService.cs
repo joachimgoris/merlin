@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Merlin.Web.Models;
 
 namespace Merlin.Web.Services.Containers;
@@ -12,9 +13,13 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     private readonly bool _socketAvailable;
     private const string ApiBase = "http://podman/v4.0.0";
 
+    // Track previous CPU stats per container for delta calculation
+    private readonly Dictionary<string, (long cpuUsage, long systemUsage)> _prevCpuStats = new();
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
     public PodmanContainerService(ContainerServiceOptions options, ILogger<PodmanContainerService> logger)
@@ -129,17 +134,29 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
             var stats = JsonSerializer.Deserialize<PodmanStats>(json, JsonOptions);
             if (stats is null) return null;
 
-            var cpuDelta = stats.CpuStats?.CpuUsage?.TotalUsage - stats.PrecpuStats?.CpuUsage?.TotalUsage ?? 0;
-            var systemDelta = stats.CpuStats?.SystemCpuUsage - stats.PrecpuStats?.SystemCpuUsage ?? 0;
-            var cpuPercent = systemDelta > 0
-                ? (double)cpuDelta / systemDelta * (stats.CpuStats?.OnlineCpus ?? 1) * 100
-                : 0;
+            // Calculate CPU % using our own previous-sample tracking
+            var currentCpu = stats.CpuStats?.CpuUsage?.TotalUsage ?? 0;
+            var currentSystem = stats.CpuStats?.SystemCpuUsage ?? 0;
+            var onlineCpus = stats.CpuStats?.OnlineCpus ?? 1;
+            if (onlineCpus == 0) onlineCpus = 1;
+
+            var cpuPercent = 0.0;
+            if (_prevCpuStats.TryGetValue(id, out var prev))
+            {
+                var cpuDelta = currentCpu - prev.cpuUsage;
+                var systemDelta = currentSystem - prev.systemUsage;
+                if (systemDelta > 0 && cpuDelta >= 0)
+                {
+                    cpuPercent = (double)cpuDelta / systemDelta * onlineCpus * 100;
+                }
+            }
+            _prevCpuStats[id] = (currentCpu, currentSystem);
 
             var memUsage = stats.MemoryStats?.Usage ?? 0;
             var memLimit = stats.MemoryStats?.Limit ?? 1;
             var memPercent = memLimit > 0 ? (double)memUsage / memLimit * 100 : 0;
 
-            return new ContainerStats(id, name, Math.Clamp(cpuPercent, 0, 100 * (stats.CpuStats?.OnlineCpus ?? 1)),
+            return new ContainerStats(id, name, Math.Clamp(cpuPercent, 0, 100 * onlineCpus),
                 memUsage, memLimit, Math.Clamp(memPercent, 0, 100), 0, 0);
         }
         catch (Exception ex)
@@ -228,26 +245,40 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
 
     private sealed class PodmanStats
     {
+        [JsonPropertyName("cpu_stats")]
         public PodmanCpuStats? CpuStats { get; set; }
+
+        [JsonPropertyName("precpu_stats")]
         public PodmanCpuStats? PrecpuStats { get; set; }
+
+        [JsonPropertyName("memory_stats")]
         public PodmanMemoryStats? MemoryStats { get; set; }
     }
 
     private sealed class PodmanCpuStats
     {
+        [JsonPropertyName("cpu_usage")]
         public PodmanCpuUsage? CpuUsage { get; set; }
+
+        [JsonPropertyName("system_cpu_usage")]
         public long SystemCpuUsage { get; set; }
+
+        [JsonPropertyName("online_cpus")]
         public int OnlineCpus { get; set; }
     }
 
     private sealed class PodmanCpuUsage
     {
+        [JsonPropertyName("total_usage")]
         public long TotalUsage { get; set; }
     }
 
     private sealed class PodmanMemoryStats
     {
+        [JsonPropertyName("usage")]
         public long Usage { get; set; }
+
+        [JsonPropertyName("limit")]
         public long Limit { get; set; }
     }
 }
