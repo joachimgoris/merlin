@@ -184,14 +184,20 @@ public sealed class LinuxMetricsCollector(
         try
         {
             var mounts = new List<DiskMountMetrics>();
-            var mountLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "mounts"), ct);
+
+            // Read the HOST's mount table (PID 1), not the container's
+            var mountsFile = Path.Combine(options.ProcPath, "1", "mounts");
+            if (!File.Exists(mountsFile))
+                mountsFile = Path.Combine(options.ProcPath, "mounts");
+
+            var mountLines = await File.ReadAllLinesAsync(mountsFile, ct);
 
             // Read diskstats for I/O rates
             var diskStatsLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "diskstats"), ct);
             var currentDiskSectors = ParseDiskStats(diskStatsLines);
 
             var pseudoFs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { "tmpfs", "proc", "sysfs", "devtmpfs", "cgroup", "cgroup2", "overlay", "devpts", "mqueue", "hugetlbfs", "debugfs", "securityfs", "pstore", "bpf", "tracefs", "fusectl", "configfs", "efivarfs", "squashfs", "fuse.snapfuse" };
+                { "tmpfs", "proc", "sysfs", "devtmpfs", "cgroup", "cgroup2", "overlay", "devpts", "mqueue", "hugetlbfs", "debugfs", "securityfs", "pstore", "bpf", "tracefs", "fusectl", "configfs", "efivarfs", "squashfs", "fuse.snapfuse", "autofs", "binfmt_misc" };
 
             // Track seen devices to avoid duplicate mounts for the same partition
             var seenDevices = new HashSet<string>();
@@ -211,10 +217,12 @@ public sealed class LinuxMetricsCollector(
 
                 try
                 {
-                    // When running in a container with host root mounted, stat via the host root path
+                    // Stat the actual path: prefix with host root when running in a container
                     var statPath = options.HostRootPath is not null
                         ? Path.Combine(options.HostRootPath, mountPoint.TrimStart('/'))
                         : mountPoint;
+
+                    if (!Directory.Exists(statPath)) continue;
 
                     var driveInfo = new DriveInfo(statPath);
                     if (!driveInfo.IsReady || driveInfo.TotalSize == 0) continue;
