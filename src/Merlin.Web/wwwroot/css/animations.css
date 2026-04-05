@@ -49,6 +49,27 @@
   }
 }
 
+/* Skeleton shimmer for metric values before data loads */
+.skeleton {
+  color: transparent !important;
+  background: var(--color-surface-border);
+  border-radius: var(--radius-sm);
+  transition: opacity var(--duration-normal) var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-border) 25%,
+      var(--color-surface-elevated) 50%,
+      var(--color-surface-border) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

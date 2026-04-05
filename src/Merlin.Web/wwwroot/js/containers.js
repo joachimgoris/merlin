@@ -85,6 +85,7 @@ export function updateContainerList(containers) {
   }
 
   // Add or update cards
+  const newCards = [];
   for (const [id, container] of incoming) {
     let card = grid.querySelector(`[data-container-id="${id}"]`);
 
@@ -94,7 +95,7 @@ export function updateContainerList(containers) {
       card.addEventListener('click', () => openDrawer(container));
       grid.appendChild(card);
       initContainerSparklines(id, card);
-      animateCardIn(card);
+      newCards.push(card);
     }
 
     const dot = card.querySelector('.status-dot');
@@ -104,6 +105,16 @@ export function updateContainerList(containers) {
     card.querySelector('.container-card__image').textContent = container.image;
 
     currentContainers.set(id, container);
+  }
+
+  // Staggered entrance for the first batch; individual animation for later additions
+  if (containerFirstRender && newCards.length > 0) {
+    containerFirstRender = false;
+    animateStaggeredGrid('#container-grid');
+  } else {
+    for (const card of newCards) {
+      animateCardIn(card);
+    }
   }
 
   applyUpdateBadges();
