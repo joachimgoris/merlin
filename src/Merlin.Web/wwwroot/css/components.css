@@ -228,7 +228,7 @@
 .container-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-accent-container);
+  border-color: oklch(72% 0.2 280);
 }
 
 .container-card__header {
@@ -308,6 +308,7 @@
 }
 
 .container-sparkline {
+  display: block;
   width: 100%;
   height: 28px;
   border-radius: var(--radius-sm);
@@ -487,11 +488,11 @@
 .btn:hover {
   background: var(--color-surface-elevated);
   border-color: var(--color-text-muted);
-  transform: scale(1.02);
+  transform: scale(1.05);
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
 }
 
 .btn--danger {

@@ -13,8 +13,8 @@
   /* Metric accents */
   --color-accent-cpu: oklch(75% 0.18 250);
   --color-accent-mem: oklch(72% 0.2 310);
-  --color-accent-disk: oklch(75% 0.15 160);
-  --color-accent-net: oklch(78% 0.18 140);
+  --color-accent-disk: oklch(78% 0.15 75);
+  --color-accent-net: oklch(78% 0.15 200);
   --color-accent-temp: oklch(75% 0.2 30);
   --color-accent-container: oklch(72% 0.16 280);
 
