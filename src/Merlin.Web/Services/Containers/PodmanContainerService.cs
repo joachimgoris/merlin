@@ -260,6 +260,57 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         }
     }
 
+    public async Task<string> CreateExecAsync(string containerId, string[] command, CancellationToken ct = default)
+    {
+        if (!_socketAvailable)
+            throw new InvalidOperationException("Podman socket is not available.");
+
+        var body = new { AttachStdin = true, AttachStdout = true, AttachStderr = true, Tty = true, Cmd = command };
+        var content = new StringContent(
+            JsonSerializer.Serialize(body),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var response = await _client.PostAsync($"{ApiBase}/containers/{containerId}/exec", content, ct);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var doc = JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("Id").GetString()
+            ?? throw new InvalidOperationException("Exec creation did not return an ID.");
+    }
+
+    public async Task<Stream> StartExecAsync(string execId, CancellationToken ct = default)
+    {
+        if (!_socketAvailable)
+            throw new InvalidOperationException("Podman socket is not available.");
+
+        var body = new { Detach = false, Tty = true };
+        var content = new StringContent(
+            JsonSerializer.Serialize(body),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBase}/exec/{execId}/start")
+        {
+            Content = content,
+        };
+
+        var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStreamAsync(ct);
+    }
+
+    public async Task ResizeExecAsync(string execId, int cols, int rows, CancellationToken ct = default)
+    {
+        if (!_socketAvailable) return;
+
+        using var response = await _client.PostAsync(
+            $"{ApiBase}/exec/{execId}/resize?h={rows}&w={cols}", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
     public void Dispose()
     {
         _client.Dispose();

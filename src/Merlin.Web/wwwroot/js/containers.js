@@ -1,6 +1,7 @@
 import { startContainer, stopContainer, restartContainer, streamLogs } from './signalr-client.js';
-import { animateCardIn, animateCardOut, animateNumberTo } from './animations.js';
+import { animateCardIn, animateCardOut, animateNumberTo, animateStaggeredGrid } from './animations.js';
 import { createSparkline } from './charts.js';
+import { openTerminal, closeTerminal } from './terminal.js';
 
 const grid = document.getElementById('container-grid');
 const emptyState = document.getElementById('container-empty');
@@ -18,6 +19,8 @@ const drawerMem = document.getElementById('drawer-mem');
 const drawerNetTx = document.getElementById('drawer-net-tx');
 const drawerNetRx = document.getElementById('drawer-net-rx');
 const countEl = document.getElementById('container-count');
+const drawerTerminal = document.getElementById('drawer-terminal');
+const drawerSearch = document.querySelector('.detail-drawer__search');
 
 const cpuSparklineColor = getComputedStyle(document.documentElement)
   .getPropertyValue('--color-accent-cpu').trim() || '#60a5fa';
@@ -36,6 +39,14 @@ let cancelLogStream = null;
 let logBuffer = [];
 let logSearchQuery = '';
 let logSearchDebounceTimer = null;
+/** @type {'logs' | 'terminal'} */
+let drawerView = 'logs';
+
+/** @type {Map<string, boolean>} image reference -> update available */
+let imageUpdateMap = new Map();
+
+/** Track whether the first batch of container cards has been rendered. */
+let containerFirstRender = true;
 
 /**
  * Converts a byte-per-second value to a human-readable rate string.
@@ -94,6 +105,8 @@ export function updateContainerList(containers) {
 
     currentContainers.set(id, container);
   }
+
+  applyUpdateBadges();
 }
 
 export function updateContainerStats(stats) {
@@ -186,6 +199,29 @@ function clearLogState() {
   logSearchInput.value = '';
 }
 
+/**
+ * Switch the drawer to show the logs view.
+ */
+function showLogsView() {
+  drawerView = 'logs';
+  closeTerminal();
+  drawerLogs.hidden = false;
+  drawerSearch.hidden = false;
+  drawerTerminal.hidden = true;
+}
+
+/**
+ * Switch the drawer to show the terminal view.
+ * @param {string} containerId
+ */
+function showTerminalView(containerId) {
+  drawerView = 'terminal';
+  drawerLogs.hidden = true;
+  drawerSearch.hidden = true;
+  drawerTerminal.hidden = false;
+  openTerminal(containerId);
+}
+
 function openDrawer(container) {
   openContainerId = container.id;
   drawerName.textContent = container.name;
@@ -193,11 +229,19 @@ function openDrawer(container) {
   drawerLogs.innerHTML = '';
   clearLogState();
 
+  // Reset to logs view
+  drawerView = 'logs';
+  drawerLogs.hidden = false;
+  drawerSearch.hidden = false;
+  drawerTerminal.hidden = true;
+
   // Build actions
   drawerActions.innerHTML = '';
   if (container.state === 'running') {
     drawerActions.appendChild(makeButton('Stop', 'btn btn--danger', () => stopContainer(container.id)));
     drawerActions.appendChild(makeButton('Restart', 'btn', () => restartContainer(container.id)));
+    drawerActions.appendChild(makeButton('Terminal', 'btn btn--terminal', () => showTerminalView(container.id)));
+    drawerActions.appendChild(makeButton('Logs', 'btn btn--logs', () => showLogsView()));
   } else {
     drawerActions.appendChild(makeButton('Start', 'btn btn--success', () => startContainer(container.id)));
   }
@@ -236,7 +280,9 @@ function closeDrawer() {
   drawer.classList.remove('detail-drawer--open');
   overlay.classList.remove('overlay--visible');
   if (cancelLogStream) { cancelLogStream(); cancelLogStream = null; }
+  closeTerminal();
   clearLogState();
+  drawerView = 'logs';
 }
 
 function makeButton(text, className, onClick) {
@@ -296,6 +342,36 @@ export function updateContainerSparklines(data) {
       sparklines.cpu.update(series.cpu[0]);
       sparklines.mem.update(series.mem[0]);
     }
+  }
+}
+
+/**
+ * Processes image update status data and shows/hides update badges on cards.
+ * @param {Array<{imageReference: string, updateAvailable: boolean}>} updates
+ */
+export function updateImageUpdates(updates) {
+  imageUpdateMap.clear();
+  for (const update of updates) {
+    if (update.updateAvailable) {
+      imageUpdateMap.set(update.imageReference, true);
+    }
+  }
+  applyUpdateBadges();
+}
+
+/**
+ * Shows or hides update badges on all container cards based on current image update data.
+ */
+function applyUpdateBadges() {
+  for (const [id, container] of currentContainers) {
+    const card = grid.querySelector(`[data-container-id="${id}"]`);
+    if (!card) continue;
+
+    const badge = card.querySelector('.update-badge');
+    if (!badge) continue;
+
+    const hasUpdate = imageUpdateMap.has(container.image);
+    badge.hidden = !hasUpdate;
   }
 }
 

@@ -1,8 +1,12 @@
 import * as hub from './signalr-client.js';
 import * as anim from './animations.js';
 import { createSparkline, createAreaChart } from './charts.js';
-import { updateContainerList, updateContainerStats, updateContainerSparklines } from './containers.js';
+import { updateContainerList, updateContainerStats, updateContainerSparklines, updateImageUpdates } from './containers.js';
 import { initProcessList, updateProcessList } from './processes.js';
+
+// Threshold pulse tracking — only pulse once per crossing direction
+let cpuWasAboveThreshold = false;
+let memWasAboveThreshold = false;
 
 // DOM refs
 const cpuGaugeFill = document.getElementById('cpu-gauge-fill');
@@ -46,12 +50,23 @@ function formatRate(bytesPerSec) {
 }
 
 function updateSystemMetrics(m) {
+  // Remove skeleton classes on first data arrival
+  cpuGaugeText.classList.remove('skeleton');
+  memGaugeText.classList.remove('skeleton');
+
   // CPU
   anim.animateGaugeRing(cpuGaugeFill, m.cpu.totalUsagePercent);
   anim.animateNumberTo(cpuGaugeText, m.cpu.totalUsagePercent, v => Math.round(v) + '%');
   cpuFreq.textContent = m.cpu.frequencyMhz > 0 ? Math.round(m.cpu.frequencyMhz) + ' MHz' : '';
   cpuLoad.textContent = `${m.cpu.loadAvg1.toFixed(2)} / ${m.cpu.loadAvg5.toFixed(2)} / ${m.cpu.loadAvg15.toFixed(2)}`;
   cpuSparkline.update(m.cpu.totalUsagePercent);
+
+  // Pulse when CPU crosses 80% threshold
+  const cpuAbove = m.cpu.totalUsagePercent > 80;
+  if (cpuAbove && !cpuWasAboveThreshold) {
+    anim.animatePulse(cpuGaugeFill.closest('.metric-card'));
+  }
+  cpuWasAboveThreshold = cpuAbove;
 
   // Per-core bars
   updateCoreBars(m.cpu.perCoreUsagePercent);
@@ -64,6 +79,13 @@ function updateSystemMetrics(m) {
   memTotal.textContent = formatBytes(m.memory.totalBytes);
   swapUsage.textContent = `${formatBytes(m.memory.swapUsedBytes)} / ${formatBytes(m.memory.swapTotalBytes)}`;
   memSparkline.update(memPercent);
+
+  // Pulse when memory crosses 90% threshold
+  const memAbove = memPercent > 90;
+  if (memAbove && !memWasAboveThreshold) {
+    anim.animatePulse(memGaugeFill.closest('.metric-card'));
+  }
+  memWasAboveThreshold = memAbove;
 
   // Disk
   updateDiskMounts(m.disk.mounts);
@@ -171,14 +193,19 @@ function updateTempSensors(sensors) {
 async function main() {
   await anim.init();
 
-  // Entrance animation for metric cards
-  anim.animateEntrance(document.querySelectorAll('.metric-card'));
+  // Add skeleton shimmer to metric values before data arrives
+  cpuGaugeText.classList.add('skeleton');
+  memGaugeText.classList.add('skeleton');
+
+  // Staggered entrance for metric cards
+  anim.animateStaggeredGrid('.metrics-grid');
 
   hub.onSystemMetrics(updateSystemMetrics);
   hub.onContainerList(updateContainerList);
   hub.onContainerStats(updateContainerStats);
   hub.onContainerSparklines(updateContainerSparklines);
   hub.onProcessList(updateProcessList);
+  hub.onImageUpdates(updateImageUpdates);
 
   await initProcessList();
 
@@ -210,6 +237,16 @@ async function main() {
     }
   } catch (e) {
     console.warn('Failed to load sparkline history:', e);
+  }
+
+  // Fetch initial image update status
+  try {
+    const imageUpdatesRes = await fetch('/api/containers/image-updates');
+    if (imageUpdatesRes.ok) {
+      updateImageUpdates(await imageUpdatesRes.json());
+    }
+  } catch (e) {
+    console.warn('Failed to load image update status:', e);
   }
 
   await hub.start();

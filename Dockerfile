@@ -18,6 +18,9 @@ ENV PODMAN_SOCKET_PATH=/var/run/podman/podman.sock
 
 EXPOSE 5050
 
+RUN mkdir -p /app/data
+VOLUME ["/app/data"]
+
 COPY --from=build /app .
 
 ENTRYPOINT ["dotnet", "Merlin.Web.dll"]

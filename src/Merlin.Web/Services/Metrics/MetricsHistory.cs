@@ -42,6 +42,26 @@ public sealed class MetricsHistory
         }
     }
 
+    public IReadOnlyList<SystemMetrics> GetLatest(int count)
+    {
+        lock (_lock)
+        {
+            if (_count == 0 || count <= 0) return [];
+
+            var take = Math.Min(count, _count);
+            var result = new List<SystemMetrics>(take);
+
+            for (var i = take - 1; i >= 0; i--)
+            {
+                var idx = (_index - i + Capacity) % Capacity;
+                var item = _buffer[idx];
+                if (item is not null) result.Add(item);
+            }
+
+            return result;
+        }
+    }
+
     public IReadOnlyList<SystemMetrics> GetRange(TimeSpan lookback)
     {
         lock (_lock)
