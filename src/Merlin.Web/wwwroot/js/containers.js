@@ -18,6 +18,10 @@ const drawerCpu = document.getElementById('drawer-cpu');
 const drawerMem = document.getElementById('drawer-mem');
 const drawerNetTx = document.getElementById('drawer-net-tx');
 const drawerNetRx = document.getElementById('drawer-net-rx');
+const drawerImageId = document.getElementById('drawer-image-id');
+const drawerStatus = document.getElementById('drawer-status');
+const drawerCreated = document.getElementById('drawer-created');
+const drawerUptime = document.getElementById('drawer-uptime');
 const countEl = document.getElementById('container-count');
 const drawerTerminal = document.getElementById('drawer-terminal');
 const drawerSearch = document.querySelector('.detail-drawer__search');
@@ -53,6 +57,19 @@ let containerFirstRender = true;
  * @param {number} bytesPerSec
  * @returns {string}
  */
+function formatUptime(uptimeStr) {
+  if (!uptimeStr) return '--';
+  // Parse .NET TimeSpan format like "1.02:30:45" or "02:30:45"
+  const match = uptimeStr.match(/(?:(\d+)\.)?(\d+):(\d+):(\d+)/);
+  if (!match) return uptimeStr;
+  const [, days, hours, minutes] = match;
+  const parts = [];
+  if (days && days !== '0') parts.push(`${days}d`);
+  if (hours && hours !== '00') parts.push(`${parseInt(hours)}h`);
+  parts.push(`${parseInt(minutes)}m`);
+  return parts.join(' ') || '< 1m';
+}
+
 function formatRate(bytesPerSec) {
   if (bytesPerSec === 0 || !Number.isFinite(bytesPerSec)) return '0 B/s';
   const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
@@ -237,6 +254,12 @@ function openDrawer(container) {
   openContainerId = container.id;
   drawerName.textContent = container.name;
   drawerImage.textContent = container.image;
+  drawerImageId.textContent = container.imageId || '--';
+  drawerStatus.textContent = container.status || '--';
+  drawerCreated.textContent = container.created
+    ? new Date(container.created).toLocaleString()
+    : '--';
+  drawerUptime.textContent = formatUptime(container.uptime);
   drawerLogs.innerHTML = '';
   clearLogState();
 

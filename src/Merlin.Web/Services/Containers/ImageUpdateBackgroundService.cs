@@ -13,8 +13,10 @@ public sealed class ImageUpdateBackgroundService(
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ContainerChangeCheckInterval = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<string, ImageUpdateStatus> _latestResults = new();
+    private readonly ConcurrentDictionary<string, string> _knownImageIds = new();
 
     public IReadOnlyDictionary<string, ImageUpdateStatus> LatestResults => _latestResults;
 
@@ -40,10 +42,49 @@ public sealed class ImageUpdateBackgroundService(
         // Initial check
         await RunCheckAsync(stoppingToken);
 
-        using var timer = new PeriodicTimer(CheckInterval);
+        // Check every 30s if containers changed (image pulled + recreated), full re-check every 15 min
+        var lastFullCheck = DateTimeOffset.UtcNow;
+        using var timer = new PeriodicTimer(ContainerChangeCheckInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            await RunCheckAsync(stoppingToken);
+            if (DateTimeOffset.UtcNow - lastFullCheck >= CheckInterval)
+            {
+                await RunCheckAsync(stoppingToken);
+                lastFullCheck = DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                await CheckForContainerChangesAsync(stoppingToken);
+            }
+        }
+    }
+
+    private async Task CheckForContainerChangesAsync(CancellationToken ct)
+    {
+        try
+        {
+            var containers = await containerService.ListContainersAsync(ct);
+            var changed = false;
+
+            foreach (var c in containers.Where(c => c.State == "running"))
+            {
+                if (_knownImageIds.TryGetValue(c.Image, out var knownId) && knownId != c.ImageId)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (changed)
+            {
+                logger.LogInformation("Container image change detected, re-checking updates");
+                updateChecker.ClearCache();
+                await RunCheckAsync(ct);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Container change detection failed");
         }
     }
 
@@ -59,6 +100,13 @@ public sealed class ImageUpdateBackgroundService(
                 _latestResults.Clear();
                 await hubContext.Clients.All.SendAsync("ImageUpdates", Array.Empty<ImageUpdateStatus>(), ct);
                 return;
+            }
+
+            // Track current image IDs for change detection
+            _knownImageIds.Clear();
+            foreach (var c in running)
+            {
+                _knownImageIds[c.Image] = c.ImageId;
             }
 
             var results = await updateChecker.CheckUpdatesAsync(running, ct);

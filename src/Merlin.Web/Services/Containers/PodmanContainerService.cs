@@ -98,8 +98,12 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
                 var uptime = c.State == "running" ? DateTimeOffset.UtcNow - startedAt : TimeSpan.Zero;
                 var health = c.Status ?? "unknown";
 
+                var imageId = c.ImageId is { Length: >= 12 }
+                    ? c.ImageId[..12]
+                    : c.ImageId ?? "";
+
                 return new ContainerInfo(
-                    c.Id, name, c.Image ?? "unknown", c.Status ?? "unknown",
+                    c.Id, name, c.Image ?? "unknown", imageId, c.Status ?? "unknown",
                     c.State ?? "unknown", health, created, uptime);
             }).ToList();
         }
@@ -322,6 +326,10 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         public string Id { get; set; } = "";
         public List<string>? Names { get; set; }
         public string? Image { get; set; }
+
+        [JsonPropertyName("image_id")]
+        public string? ImageId { get; set; }
+
         public string? Status { get; set; }
         public string? State { get; set; }
         public long Created { get; set; }

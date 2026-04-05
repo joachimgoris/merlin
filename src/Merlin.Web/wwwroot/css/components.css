@@ -386,6 +386,32 @@
   background: var(--color-surface);
 }
 
+.detail-drawer__meta {
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--color-surface-border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-4);
+}
+
+.detail-drawer__meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-drawer__meta-label {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.detail-drawer__meta-value {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
 .detail-drawer__actions {
   display: flex;
   gap: var(--space-2);
