@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -14,7 +15,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     private const string ApiBase = "http://podman/v4.0.0";
 
     // Track previous CPU stats per container for delta calculation
-    private readonly Dictionary<string, (long cpuUsage, long systemUsage)> _prevCpuStats = new();
+    private readonly ConcurrentDictionary<string, (long cpuUsage, long systemUsage)> _prevCpuStats = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -85,9 +86,13 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
 
             return containers.Select(c =>
             {
-                var name = c.Names?.FirstOrDefault()?.TrimStart('/') ?? c.Id[..12];
+                var name = c.Names?.FirstOrDefault()?.TrimStart('/')
+                    ?? (c.Id.Length >= 12 ? c.Id[..12] : c.Id);
                 var created = DateTimeOffset.FromUnixTimeSeconds(c.Created);
-                var uptime = c.State == "running" ? DateTimeOffset.UtcNow - created : TimeSpan.Zero;
+                var startedAt = c.StartedAt > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds(c.StartedAt)
+                    : created;
+                var uptime = c.State == "running" ? DateTimeOffset.UtcNow - startedAt : TimeSpan.Zero;
                 var health = c.Status ?? "unknown";
 
                 return new ContainerInfo(
@@ -169,7 +174,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     public async Task StartAsync(string id, CancellationToken ct = default)
     {
         if (!_socketAvailable) return;
-        var response = await _client.PostAsync($"{ApiBase}/containers/{id}/start", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/start", null, ct);
         if ((int)response.StatusCode != 304) // 304 = already started
             response.EnsureSuccessStatusCode();
     }
@@ -177,7 +182,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     public async Task StopAsync(string id, CancellationToken ct = default)
     {
         if (!_socketAvailable) return;
-        var response = await _client.PostAsync($"{ApiBase}/containers/{id}/stop", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/stop", null, ct);
         if ((int)response.StatusCode != 304) // 304 = already stopped
             response.EnsureSuccessStatusCode();
     }
@@ -185,7 +190,8 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     public async Task RestartAsync(string id, CancellationToken ct = default)
     {
         if (!_socketAvailable) return;
-        await _client.PostAsync($"{ApiBase}/containers/{id}/restart", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/restart", null, ct);
+        response.EnsureSuccessStatusCode();
     }
 
     public async IAsyncEnumerable<string> StreamLogsAsync(
@@ -241,6 +247,9 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         public string? Status { get; set; }
         public string? State { get; set; }
         public long Created { get; set; }
+
+        [JsonPropertyName("started_at")]
+        public long StartedAt { get; set; }
     }
 
     private sealed class PodmanStats

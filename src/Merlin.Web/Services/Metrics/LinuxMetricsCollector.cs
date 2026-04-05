@@ -22,7 +22,7 @@ public sealed class LinuxMetricsCollector(
         var memory = await CollectMemoryAsync(ct);
         var disk = await CollectDiskAsync(elapsed, ct);
         var network = await CollectNetworkAsync(elapsed, ct);
-        var temperature = CollectTemperature();
+        var temperature = await CollectTemperatureAsync(ct);
 
         _prevTimestamp = now;
 
@@ -322,7 +322,7 @@ public sealed class LinuxMetricsCollector(
         }
     }
 
-    private TemperatureMetrics CollectTemperature()
+    private async Task<TemperatureMetrics> CollectTemperatureAsync(CancellationToken ct)
     {
         var sensors = new List<TemperatureSensor>();
 
@@ -339,8 +339,10 @@ public sealed class LinuxMetricsCollector(
 
                     if (!File.Exists(tempFile)) continue;
 
-                    var tempStr = File.ReadAllText(tempFile).Trim();
-                    var label = File.Exists(typeFile) ? File.ReadAllText(typeFile).Trim() : Path.GetFileName(zone);
+                    var tempStr = (await File.ReadAllTextAsync(tempFile, ct)).Trim();
+                    var label = File.Exists(typeFile)
+                        ? (await File.ReadAllTextAsync(typeFile, ct)).Trim()
+                        : Path.GetFileName(zone);
 
                     if (long.TryParse(tempStr, out var milliDegrees))
                     {
@@ -362,11 +364,14 @@ public sealed class LinuxMetricsCollector(
                         var labelFile = Path.Combine(hwmon, $"{prefix}_label");
                         var critFile = Path.Combine(hwmon, $"{prefix}_crit");
 
-                        var tempStr = File.ReadAllText(tempFile).Trim();
-                        var label = File.Exists(labelFile) ? File.ReadAllText(labelFile).Trim() : prefix;
+                        var tempStr = (await File.ReadAllTextAsync(tempFile, ct)).Trim();
+                        var label = File.Exists(labelFile)
+                            ? (await File.ReadAllTextAsync(labelFile, ct)).Trim()
+                            : prefix;
 
                         double? critical = null;
-                        if (File.Exists(critFile) && long.TryParse(File.ReadAllText(critFile).Trim(), out var critMilliDeg))
+                        if (File.Exists(critFile) &&
+                            long.TryParse((await File.ReadAllTextAsync(critFile, ct)).Trim(), out var critMilliDeg))
                         {
                             critical = critMilliDeg / 1000.0;
                         }
@@ -379,6 +384,7 @@ public sealed class LinuxMetricsCollector(
                 }
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to collect temperature metrics");
