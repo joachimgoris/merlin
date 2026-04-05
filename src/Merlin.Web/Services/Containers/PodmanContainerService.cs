@@ -17,6 +17,9 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     // Track previous CPU stats per container for delta calculation
     private readonly ConcurrentDictionary<string, (long cpuUsage, long systemUsage)> _prevCpuStats = new();
 
+    // Track previous network bytes per container for rate calculation
+    private readonly ConcurrentDictionary<string, (long rx, long tx, DateTimeOffset timestamp)> _prevNetStats = new();
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -161,8 +164,32 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
             var memLimit = stats.MemoryStats?.Limit ?? 1;
             var memPercent = memLimit > 0 ? (double)memUsage / memLimit * 100 : 0;
 
+            // Calculate network rates from cumulative byte counters
+            long totalRx = 0, totalTx = 0;
+            if (stats.Networks is not null)
+            {
+                foreach (var iface in stats.Networks.Values)
+                {
+                    totalRx += iface.RxBytes;
+                    totalTx += iface.TxBytes;
+                }
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            double netRxRate = 0, netTxRate = 0;
+            if (_prevNetStats.TryGetValue(id, out var prevNet))
+            {
+                var elapsed = (now - prevNet.timestamp).TotalSeconds;
+                if (elapsed > 0)
+                {
+                    netRxRate = Math.Max(0, (totalRx - prevNet.rx) / elapsed);
+                    netTxRate = Math.Max(0, (totalTx - prevNet.tx) / elapsed);
+                }
+            }
+            _prevNetStats[id] = (totalRx, totalTx, now);
+
             return new ContainerStats(id, name, Math.Clamp(cpuPercent, 0, 100 * onlineCpus),
-                memUsage, memLimit, Math.Clamp(memPercent, 0, 100), 0, 0);
+                memUsage, memLimit, Math.Clamp(memPercent, 0, 100), netTxRate, netRxRate);
         }
         catch (Exception ex)
         {
@@ -262,6 +289,18 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
 
         [JsonPropertyName("memory_stats")]
         public PodmanMemoryStats? MemoryStats { get; set; }
+
+        [JsonPropertyName("networks")]
+        public Dictionary<string, PodmanNetworkStats>? Networks { get; set; }
+    }
+
+    private sealed class PodmanNetworkStats
+    {
+        [JsonPropertyName("rx_bytes")]
+        public long RxBytes { get; set; }
+
+        [JsonPropertyName("tx_bytes")]
+        public long TxBytes { get; set; }
     }
 
     private sealed class PodmanCpuStats

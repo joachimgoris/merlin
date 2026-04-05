@@ -112,6 +112,28 @@
       </section>
     </div>
 
+    <!-- Processes -->
+    <section class="process-section" id="process-section" aria-labelledby="process-heading">
+      <div class="section-header">
+        <h2 id="process-heading">Processes</h2>
+        <button class="btn btn--sm" id="process-toggle">Show</button>
+      </div>
+      <div class="process-table-wrapper" id="process-table-wrapper" hidden>
+        <table class="process-table" id="process-table">
+          <thead>
+            <tr>
+              <th data-sort="pid">PID</th>
+              <th data-sort="name">Name</th>
+              <th data-sort="cpu" class="sorted">CPU %</th>
+              <th data-sort="mem">Memory</th>
+              <th data-sort="state">State</th>
+            </tr>
+          </thead>
+          <tbody id="process-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Containers -->
     <section class="containers-section" aria-labelledby="containers-heading">
       <div class="containers-section__header">
@@ -136,6 +158,27 @@
       <button class="detail-drawer__close" id="drawer-close" aria-label="Close">&times;</button>
     </div>
     <div class="detail-drawer__actions" id="drawer-actions"></div>
+    <div class="detail-drawer__stats" id="drawer-stats">
+      <div class="detail-drawer__stat">
+        <span class="detail-drawer__stat-label">CPU</span>
+        <span class="detail-drawer__stat-value" id="drawer-cpu">--</span>
+      </div>
+      <div class="detail-drawer__stat">
+        <span class="detail-drawer__stat-label">Memory</span>
+        <span class="detail-drawer__stat-value" id="drawer-mem">--</span>
+      </div>
+      <div class="detail-drawer__stat">
+        <span class="detail-drawer__stat-label">Net Tx</span>
+        <span class="detail-drawer__stat-value" id="drawer-net-tx">--</span>
+      </div>
+      <div class="detail-drawer__stat">
+        <span class="detail-drawer__stat-label">Net Rx</span>
+        <span class="detail-drawer__stat-value" id="drawer-net-rx">--</span>
+      </div>
+    </div>
+    <div class="detail-drawer__search">
+      <input type="search" id="drawer-log-search" class="log-search-input" placeholder="Filter logs..." aria-label="Filter container logs">
+    </div>
     <div class="detail-drawer__logs" id="drawer-logs"></div>
   </aside>
 
@@ -156,6 +199,14 @@
           <div class="container-card__stat-label">Memory</div>
           <div class="container-card__stat-value" data-stat="mem">0%</div>
         </div>
+        <div>
+          <div class="container-card__stat-label">Network</div>
+          <div class="container-card__stat-value" data-stat="net">--</div>
+        </div>
+      </div>
+      <div class="container-card__sparklines">
+        <canvas class="container-sparkline" data-sparkline="cpu"></canvas>
+        <canvas class="container-sparkline" data-sparkline="mem"></canvas>
       </div>
     </article>
   </template>

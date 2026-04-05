@@ -1,7 +1,8 @@
 import * as hub from './signalr-client.js';
 import * as anim from './animations.js';
 import { createSparkline, createAreaChart } from './charts.js';
-import { updateContainerList, updateContainerStats } from './containers.js';
+import { updateContainerList, updateContainerStats, updateContainerSparklines } from './containers.js';
+import { initProcessList, updateProcessList } from './processes.js';
 
 // DOM refs
 const cpuGaugeFill = document.getElementById('cpu-gauge-fill');
@@ -176,6 +177,10 @@ async function main() {
   hub.onSystemMetrics(updateSystemMetrics);
   hub.onContainerList(updateContainerList);
   hub.onContainerStats(updateContainerStats);
+  hub.onContainerSparklines(updateContainerSparklines);
+  hub.onProcessList(updateProcessList);
+
+  await initProcessList();
 
   // Fetch initial data
   try {
@@ -195,6 +200,16 @@ async function main() {
     }
   } catch (e) {
     console.warn('Failed to load initial data:', e);
+  }
+
+  // Fetch initial sparkline history after container cards are created
+  try {
+    const sparklineRes = await fetch('/api/containers/sparklines');
+    if (sparklineRes.ok) {
+      updateContainerSparklines(await sparklineRes.json());
+    }
+  } catch (e) {
+    console.warn('Failed to load sparkline history:', e);
   }
 
   await hub.start();

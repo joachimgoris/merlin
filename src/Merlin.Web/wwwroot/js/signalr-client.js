@@ -7,11 +7,15 @@ const listeners = {
   SystemMetrics: [],
   ContainerList: [],
   ContainerStats: [],
+  ContainerSparklines: [],
+  ProcessList: [],
 };
 
 connection.on('SystemMetrics', data => listeners.SystemMetrics.forEach(cb => cb(data)));
 connection.on('ContainerList', data => listeners.ContainerList.forEach(cb => cb(data)));
 connection.on('ContainerStats', data => listeners.ContainerStats.forEach(cb => cb(data)));
+connection.on('ContainerSparklines', data => listeners.ContainerSparklines.forEach(cb => cb(data)));
+connection.on('ProcessList', data => listeners.ProcessList.forEach(cb => cb(data)));
 
 const dot = document.getElementById('connection-dot');
 const text = document.getElementById('connection-text');
@@ -48,6 +52,8 @@ export async function start() {
 export function onSystemMetrics(cb) { listeners.SystemMetrics.push(cb); }
 export function onContainerList(cb) { listeners.ContainerList.push(cb); }
 export function onContainerStats(cb) { listeners.ContainerStats.push(cb); }
+export function onContainerSparklines(cb) { listeners.ContainerSparklines.push(cb); }
+export function onProcessList(cb) { listeners.ProcessList.push(cb); }
 
 export async function startContainer(id) { await connection.invoke('StartContainer', id); }
 export async function stopContainer(id) { await connection.invoke('StopContainer', id); }

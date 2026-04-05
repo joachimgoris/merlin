@@ -1,5 +1,6 @@
 import { startContainer, stopContainer, restartContainer, streamLogs } from './signalr-client.js';
 import { animateCardIn, animateCardOut, animateNumberTo } from './animations.js';
+import { createSparkline } from './charts.js';
 
 const grid = document.getElementById('container-grid');
 const emptyState = document.getElementById('container-empty');
@@ -11,11 +12,42 @@ const drawerImage = document.getElementById('drawer-image');
 const drawerActions = document.getElementById('drawer-actions');
 const drawerLogs = document.getElementById('drawer-logs');
 const drawerClose = document.getElementById('drawer-close');
+const logSearchInput = document.getElementById('drawer-log-search');
+const drawerCpu = document.getElementById('drawer-cpu');
+const drawerMem = document.getElementById('drawer-mem');
+const drawerNetTx = document.getElementById('drawer-net-tx');
+const drawerNetRx = document.getElementById('drawer-net-rx');
 const countEl = document.getElementById('container-count');
+
+const cpuSparklineColor = getComputedStyle(document.documentElement)
+  .getPropertyValue('--color-accent-cpu').trim() || '#60a5fa';
+const memSparklineColor = getComputedStyle(document.documentElement)
+  .getPropertyValue('--color-accent-mem').trim() || '#a78bfa';
+
+/** @type {Map<string, {cpu: ReturnType<typeof createSparkline>, mem: ReturnType<typeof createSparkline>}>} */
+const containerSparklines = new Map();
+
+const LOG_BUFFER_MAX = 5000;
 
 let currentContainers = new Map();
 let openContainerId = null;
 let cancelLogStream = null;
+/** @type {string[]} */
+let logBuffer = [];
+let logSearchQuery = '';
+let logSearchDebounceTimer = null;
+
+/**
+ * Converts a byte-per-second value to a human-readable rate string.
+ * @param {number} bytesPerSec
+ * @returns {string}
+ */
+function formatRate(bytesPerSec) {
+  if (bytesPerSec === 0 || !Number.isFinite(bytesPerSec)) return '0 B/s';
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.min(Math.floor(Math.log(bytesPerSec) / Math.log(1024)), units.length - 1);
+  return (bytesPerSec / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
 
 export function updateContainerList(containers) {
   const incoming = new Map(containers.map(c => [c.id, c]));
@@ -36,6 +68,7 @@ export function updateContainerList(containers) {
     if (!incoming.has(id)) {
       const card = grid.querySelector(`[data-container-id="${id}"]`);
       if (card) animateCardOut(card);
+      destroyContainerSparklines(id);
       currentContainers.delete(id);
     }
   }
@@ -49,6 +82,7 @@ export function updateContainerList(containers) {
       card.dataset.containerId = id;
       card.addEventListener('click', () => openDrawer(container));
       grid.appendChild(card);
+      initContainerSparklines(id, card);
       animateCardIn(card);
     }
 
@@ -69,10 +103,87 @@ export function updateContainerStats(stats) {
 
     const cpuEl = card.querySelector('[data-stat="cpu"]');
     const memEl = card.querySelector('[data-stat="mem"]');
+    const netEl = card.querySelector('[data-stat="net"]');
 
     animateNumberTo(cpuEl, stat.cpuPercent, v => v.toFixed(1) + '%');
     animateNumberTo(memEl, stat.memoryPercent, v => v.toFixed(1) + '%');
+
+    if (netEl) {
+      const tx = stat.netTxBytesPerSec ?? 0;
+      const rx = stat.netRxBytesPerSec ?? 0;
+      netEl.textContent = `\u2191${formatRate(tx)} \u2193${formatRate(rx)}`;
+    }
+
+    // Update drawer stats if this container is open
+    if (stat.containerId === openContainerId) {
+      drawerCpu.textContent = stat.cpuPercent.toFixed(1) + '%';
+      drawerMem.textContent = stat.memoryPercent.toFixed(1) + '%';
+      drawerNetTx.textContent = formatRate(stat.netTxBytesPerSec ?? 0);
+      drawerNetRx.textContent = formatRate(stat.netRxBytesPerSec ?? 0);
+    }
   }
+}
+
+/**
+ * Escape HTML entities to prevent XSS when inserting log text.
+ */
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Build the inner HTML for a single log line, highlighting query matches.
+ */
+function renderLogLineHtml(line, query) {
+  const escaped = escapeHtml(line);
+  if (!query) return escaped;
+
+  const escapedQuery = escapeHtml(query);
+  const lowerEscaped = escaped.toLowerCase();
+  const lowerQuery = escapedQuery.toLowerCase();
+  const parts = [];
+  let cursor = 0;
+
+  while (cursor < lowerEscaped.length) {
+    const idx = lowerEscaped.indexOf(lowerQuery, cursor);
+    if (idx === -1) {
+      parts.push(escaped.slice(cursor));
+      break;
+    }
+    if (idx > cursor) parts.push(escaped.slice(cursor, idx));
+    parts.push('<mark class="log-highlight">');
+    parts.push(escaped.slice(idx, idx + escapedQuery.length));
+    parts.push('</mark>');
+    cursor = idx + escapedQuery.length;
+  }
+
+  return parts.join('');
+}
+
+function renderFilteredLogs() {
+  const query = logSearchQuery;
+  const fragment = document.createDocumentFragment();
+
+  for (const line of logBuffer) {
+    if (query && !line.toLowerCase().includes(query)) continue;
+    const el = document.createElement('div');
+    el.innerHTML = renderLogLineHtml(line, query);
+    fragment.appendChild(el);
+  }
+
+  drawerLogs.innerHTML = '';
+  drawerLogs.appendChild(fragment);
+  drawerLogs.scrollTop = drawerLogs.scrollHeight;
+}
+
+function clearLogState() {
+  logBuffer = [];
+  logSearchQuery = '';
+  logSearchInput.value = '';
 }
 
 function openDrawer(container) {
@@ -80,6 +191,7 @@ function openDrawer(container) {
   drawerName.textContent = container.name;
   drawerImage.textContent = container.image;
   drawerLogs.innerHTML = '';
+  clearLogState();
 
   // Build actions
   drawerActions.innerHTML = '';
@@ -94,10 +206,18 @@ function openDrawer(container) {
   if (cancelLogStream) cancelLogStream();
   cancelLogStream = streamLogs(container.id, 200,
     line => {
-      const el = document.createElement('div');
-      el.textContent = line;
-      drawerLogs.appendChild(el);
-      drawerLogs.scrollTop = drawerLogs.scrollHeight;
+      logBuffer.push(line);
+      if (logBuffer.length > LOG_BUFFER_MAX) {
+        logBuffer.splice(0, logBuffer.length - LOG_BUFFER_MAX);
+      }
+
+      const query = logSearchQuery;
+      if (!query || line.toLowerCase().includes(query)) {
+        const el = document.createElement('div');
+        el.innerHTML = renderLogLineHtml(line, query);
+        drawerLogs.appendChild(el);
+        drawerLogs.scrollTop = drawerLogs.scrollHeight;
+      }
     },
     () => {
       const el = document.createElement('div');
@@ -116,6 +236,7 @@ function closeDrawer() {
   drawer.classList.remove('detail-drawer--open');
   overlay.classList.remove('overlay--visible');
   if (cancelLogStream) { cancelLogStream(); cancelLogStream = null; }
+  clearLogState();
 }
 
 function makeButton(text, className, onClick) {
@@ -126,6 +247,66 @@ function makeButton(text, className, onClick) {
   return btn;
 }
 
+/**
+ * Creates sparkline chart instances for a container card.
+ * @param {string} containerId
+ * @param {HTMLElement} card
+ */
+function initContainerSparklines(containerId, card) {
+  const cpuCanvas = card.querySelector('[data-sparkline="cpu"]');
+  const memCanvas = card.querySelector('[data-sparkline="mem"]');
+
+  if (!cpuCanvas || !memCanvas) return;
+
+  const cpu = createSparkline(cpuCanvas, { color: cpuSparklineColor, maxPoints: 300 });
+  const mem = createSparkline(memCanvas, { color: memSparklineColor, maxPoints: 300 });
+
+  containerSparklines.set(containerId, { cpu, mem });
+}
+
+/**
+ * Destroys sparkline chart instances for a removed container.
+ * @param {string} containerId
+ */
+function destroyContainerSparklines(containerId) {
+  const sparklines = containerSparklines.get(containerId);
+  if (sparklines) {
+    sparklines.cpu.destroy();
+    sparklines.mem.destroy();
+    containerSparklines.delete(containerId);
+  }
+}
+
+/**
+ * Updates all container sparklines from a sparkline data broadcast.
+ * @param {Record<string, {cpu: number[], mem: number[]}>} data
+ */
+export function updateContainerSparklines(data) {
+  for (const [containerId, series] of Object.entries(data)) {
+    const sparklines = containerSparklines.get(containerId);
+    if (!sparklines) continue;
+
+    // When receiving full history (initial load or reconnect), replay all points
+    if (series.cpu.length > 1) {
+      for (let i = 0; i < series.cpu.length; i++) {
+        sparklines.cpu.update(series.cpu[i]);
+        sparklines.mem.update(series.mem[i]);
+      }
+    } else if (series.cpu.length === 1) {
+      sparklines.cpu.update(series.cpu[0]);
+      sparklines.mem.update(series.mem[0]);
+    }
+  }
+}
+
 drawerClose.addEventListener('click', closeDrawer);
 overlay.addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+logSearchInput.addEventListener('input', () => {
+  clearTimeout(logSearchDebounceTimer);
+  logSearchDebounceTimer = setTimeout(() => {
+    logSearchQuery = logSearchInput.value.toLowerCase();
+    renderFilteredLogs();
+  }, 150);
+});
