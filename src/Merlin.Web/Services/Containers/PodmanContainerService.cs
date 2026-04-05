@@ -327,7 +327,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         public List<string>? Names { get; set; }
         public string? Image { get; set; }
 
-        [JsonPropertyName("image_id")]
+        [JsonPropertyName("ImageID")]
         public string? ImageId { get; set; }
 
         public string? Status { get; set; }
