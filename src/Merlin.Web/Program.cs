@@ -24,11 +24,13 @@ if (!Directory.Exists(hostSysPath) && Directory.Exists("/sys"))
 
 builder.Services.AddSingleton(new MetricsCollectorOptions(hostProcPath, hostSysPath, hostRootPath));
 builder.Services.AddSingleton<ISystemMetricsCollector, LinuxMetricsCollector>();
+builder.Services.AddSingleton<ProcessCollector>();
 builder.Services.AddSingleton<MetricsHistory>();
 builder.Services.AddHostedService<MetricsBackgroundService>();
 
 builder.Services.AddSingleton(new ContainerServiceOptions(podmanSocketPath));
 builder.Services.AddSingleton<IContainerService, PodmanContainerService>();
+builder.Services.AddSingleton<ContainerMetricsHistory>();
 builder.Services.AddHostedService<ContainerStatsBackgroundService>();
 
 builder.WebHost.ConfigureKestrel(options =>
@@ -57,11 +59,39 @@ app.MapGet("/api/metrics/history", (MetricsHistory history, int minutes = 60) =>
     return Results.Ok(data);
 });
 
+app.MapGet("/api/processes", async (ProcessCollector processCollector, int top = 25, CancellationToken ct = default) =>
+{
+    var processes = await processCollector.CollectAsync(top, ct);
+    return Results.Ok(processes);
+});
+
 app.MapGet("/api/containers", async (IContainerService containers, CancellationToken ct) =>
 {
     var list = await containers.ListContainersAsync(ct);
     var stats = await containers.GetAllStatsAsync(ct);
     return Results.Ok(new { containers = list, stats });
+});
+
+app.MapGet("/api/containers/sparklines", (ContainerMetricsHistory metricsHistory) =>
+{
+    var allHistory = metricsHistory.GetAllHistory();
+    var payload = new Dictionary<string, object>(allHistory.Count);
+
+    foreach (var (containerId, snapshots) in allHistory)
+    {
+        var cpu = new double[snapshots.Count];
+        var mem = new double[snapshots.Count];
+
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            cpu[i] = Math.Round(snapshots[i].CpuPercent, 2);
+            mem[i] = Math.Round(snapshots[i].MemoryPercent, 2);
+        }
+
+        payload[containerId] = new { cpu, mem };
+    }
+
+    return Results.Ok(payload);
 });
 
 app.MapPost("/api/containers/{id}/start", async (string id, IContainerService containers, CancellationToken ct) =>
