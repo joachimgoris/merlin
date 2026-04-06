@@ -2,8 +2,7 @@ services:
   merlin:
     build: .
     container_name: merlin
-    ports:
-      - "5050:5050"
+    network_mode: host
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
