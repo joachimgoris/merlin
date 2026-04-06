@@ -1,87 +1,93 @@
 /* Homepage / Service Catalog
- * Design: Bento-style grid with bright, glassy tiles on a soft dark canvas.
- * Each tile is a frosted surface that lifts on hover.
+ * Design: Bright glass cards on dark canvas — high contrast, immediately readable.
  */
 
 .homepage-section {
-  padding-top: var(--space-4);
+  padding-top: var(--space-6);
 }
 
 /* ── Service grid ── */
 .service-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 /* ── Service tile ── */
 .service-tile {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
-  background: oklch(20% 0.02 265);
-  border: 1px solid oklch(32% 0.03 265);
-  border-radius: var(--radius-lg);
+  gap: var(--space-5);
+  padding: var(--space-6);
+  /* Noticeably lighter than the page background — stands out */
+  background: oklch(24% 0.025 265);
+  border: 1px solid oklch(36% 0.04 265);
+  border-radius: 16px;
   text-decoration: none;
   color: var(--color-text);
   position: relative;
   overflow: hidden;
-  transition: transform var(--duration-normal) var(--ease-out-expo),
-              box-shadow var(--duration-normal) var(--ease-out-expo),
-              background var(--duration-normal) var(--ease-out-expo);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s;
 }
 
-/* Soft inner glow on every tile */
-.service-tile::after {
+/* Top accent gradient — gives each tile a colored "shine" at the top edge */
+.service-tile::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity var(--duration-normal);
-  pointer-events: none;
-  background: radial-gradient(ellipse at 30% 0%, oklch(75% 0.12 250 / 0.08) 0%, transparent 70%);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, oklch(75% 0.18 250), oklch(72% 0.2 310));
+  opacity: 0.6;
+  transition: opacity 0.3s;
 }
 
-.service-tile:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 32px oklch(0% 0 0 / 0.5),
-              0 0 0 1px oklch(45% 0.06 265);
-  background: oklch(22% 0.025 265);
-}
-
-.service-tile:hover::after {
+.service-tile:hover::before {
   opacity: 1;
 }
 
-.service-tile:focus-visible {
-  outline: 2px solid var(--color-accent-cpu);
-  outline-offset: 2px;
+.service-tile:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px oklch(0% 0 0 / 0.6),
+              0 0 0 1px oklch(50% 0.08 265),
+              0 0 60px oklch(72% 0.15 265 / 0.06);
+  border-color: oklch(45% 0.06 265);
 }
 
-/* Offline state: dimmed but still readable */
+.service-tile:focus-visible {
+  outline: 2px solid oklch(75% 0.18 250);
+  outline-offset: 3px;
+}
+
+/* Offline */
 .service-tile--offline {
-  opacity: 0.55;
+  opacity: 0.45;
+}
+
+.service-tile--offline::before {
+  background: oklch(40% 0 0);
 }
 
 .service-tile--offline:hover {
-  opacity: 0.75;
+  opacity: 0.65;
 }
 
 /* ── Icon ── */
 .service-tile__icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 1.75rem;
+  font-size: 2rem;
   line-height: 1;
-  border-radius: var(--radius-md);
-  background: oklch(15% 0.02 265);
-  border: 1px solid oklch(28% 0.02 265);
+  border-radius: 14px;
+  background: oklch(16% 0.02 265);
+  border: 1px solid oklch(30% 0.03 265);
   overflow: hidden;
 }
 
@@ -99,9 +105,9 @@
 }
 
 .service-tile__name {
-  font-weight: 600;
-  font-size: var(--text-lg);
-  color: oklch(95% 0 0);
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: oklch(96% 0 0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,56 +116,58 @@
 
 .service-tile__description {
   font-size: var(--text-sm);
-  color: oklch(60% 0 0);
+  color: oklch(65% 0 0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: var(--space-1);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 /* ── Status indicator ── */
 .service-tile__status {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
-  background: oklch(75% 0.2 150);
-  box-shadow: 0 0 8px oklch(75% 0.2 150 / 0.5);
-  transition: background var(--duration-fast), box-shadow var(--duration-fast);
+  background: oklch(78% 0.2 150);
+  box-shadow: 0 0 10px oklch(78% 0.2 150 / 0.6),
+              0 0 4px oklch(78% 0.2 150 / 0.3);
 }
 
 .service-tile--offline .service-tile__status {
-  background: oklch(45% 0 0);
+  background: oklch(40% 0 0);
   box-shadow: none;
 }
 
 /* ── Group headers ── */
 .homepage-group {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
 .homepage-group__header {
   display: flex;
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-2) var(--space-3);
   background: transparent;
   border: none;
-  border-bottom: 1px solid oklch(28% 0.02 265);
+  border-bottom: 2px solid oklch(30% 0.03 265);
   cursor: pointer;
-  font-size: var(--text-sm);
-  color: oklch(55% 0 0);
+  font-size: var(--text-xs);
+  color: oklch(58% 0 0);
   align-items: center;
   gap: var(--space-3);
   font-family: inherit;
-  margin-bottom: var(--space-4);
-  transition: color var(--duration-fast);
+  margin-bottom: var(--space-5);
+  transition: color 0.15s;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 600;
+  letter-spacing: 0.1em;
+  font-weight: 700;
 }
 
 .homepage-group__header:hover {
-  color: oklch(80% 0 0);
+  color: oklch(85% 0 0);
+  border-bottom-color: oklch(45% 0.06 265);
 }
 
 .homepage-group__icon {
@@ -186,28 +194,36 @@
   font-weight: 400;
   letter-spacing: normal;
   text-transform: none;
-  color: oklch(42% 0 0);
+  color: oklch(40% 0 0);
 }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .service-grid {
     grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
 
   .service-tile {
-    padding: var(--space-4) var(--space-5);
+    padding: var(--space-5);
   }
 }
 
 @media (max-width: 480px) {
   .service-tile__icon {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     font-size: 1.5rem;
+    border-radius: 10px;
   }
 
   .service-tile__name {
     font-size: var(--text-base);
+  }
+
+  .service-tile {
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: 12px;
   }
 }
