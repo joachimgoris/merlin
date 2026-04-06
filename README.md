@@ -12,19 +12,19 @@ Merlin reads host metrics from `/proc` and `/sys`, talks to Docker or Podman via
 
 ### System Monitoring
 
-- **CPU** -- per-core utilization bars, total usage gauge, load averages (1/5/15 min), clock frequency
-- **Memory** -- used/total with gauge ring, swap usage
-- **Disk** -- per-mount usage bars with read/write I/O rates
-- **Network** -- bidirectional area chart with live TX/RX rates
-- **Temperature** -- multi-sensor readings from hwmon and thermal zones
-- **Processes** -- sortable top-N process table with CPU%, memory, PID, and state
+- **CPU** per-core utilization bars, total usage gauge, load averages (1/5/15 min), clock frequency
+- **Memory** used/total with gauge ring, swap usage
+- **Disk** per-mount usage bars with read/write I/O rates
+- **Network** bidirectional area chart with live TX/RX rates
+- **Temperature** multi-sensor readings from hwmon and thermal zones
+- **Processes** sortable top-N process table with CPU%, memory, PID, and state
 
 ### Container Management
 
 - Live stats per container: CPU, memory, network TX/RX
 - Start, stop, and restart containers from the UI
 - Log streaming with keyword search and highlighting
-- Per-container CPU and memory sparkline history (300 samples)
+- Per-container CPU and memory sparkline history
 - Docker Compose project grouping with collapsible sections
 - Health check status indicators and detail view
 - Image update detection (compares local digest against remote registry)
@@ -117,7 +117,7 @@ All host mounts are **read-only**. The container socket is the only read-write m
 | `MERLIN_ALERT_DISK_THRESHOLD` | `95` | Disk % per mount to trigger alert |
 | `MERLIN_ALERT_COOLDOWN_MINUTES` | `15` | Minutes between repeated alerts of the same type |
 
-### Homepage -- Container Labels
+### Homepage Container Labels
 
 Add labels to any container to make it appear on the homepage:
 
@@ -145,7 +145,7 @@ services:
       merlin.homepage.description: "DNS ad blocker"
 ```
 
-### Homepage -- Static Config
+### Homepage Static Config
 
 Create a `homepage.json` file and mount it into the container (or place it at the `MERLIN_HOMEPAGE_CONFIG` path):
 
@@ -178,11 +178,11 @@ volumes:
   - ./homepage.json:/app/data/homepage.json:ro
 ```
 
-The file is hot-reloaded when modified -- no restart required. Container-discovered services take precedence when the same name+URL appears in both sources.
+The file is hot-reloaded when modified, no restart required. Container-discovered services take precedence when the same name+URL appears in both sources.
 
 ### Discord Alerts
 
-1. In your Discord server, go to a channel's settings and create a webhook under **Integrations > Webhooks**.
+1. In your Discord server, go to a channel's settings and create a webhook under **Integrations -> Webhooks**.
 2. Copy the webhook URL.
 3. Set the environment variable:
 
@@ -243,17 +243,17 @@ AlertBackgroundService --> AlertEvaluator --> DiscordWebhookClient
 
 ### Backend
 
-- **LinuxMetricsCollector** -- parses `/proc/stat`, `/proc/meminfo`, `/proc/net/dev`, `/proc/diskstats`, `/proc/1/mounts`, `/sys/class/thermal`, `/sys/class/hwmon`
-- **SystemInfoCollector** -- reads hostname, OS, kernel version, CPU model, total RAM (cached after first read)
-- **ProcessCollector** -- reads `/proc/[pid]/stat` and `/proc/[pid]/status` for top-N processes by CPU
-- **PodmanContainerService** -- HTTP client over Unix domain socket, compatible with the Docker and Podman API
-- **MetricsHistory** -- thread-safe ring buffer storing 86,400 snapshots (24 hours at 1/s)
-- **ContainerMetricsHistory** -- per-container ring buffer (300 samples) for sparkline data
-- **MetricsRepository** -- SQLite persistence with WAL mode, batch inserts, and automatic pruning
-- **ImageUpdateChecker** -- compares local image digests against remote registry manifests
-- **ServiceDiscovery** -- merges container labels and static config into the homepage service catalog
-- **AlertEvaluator** -- evaluates CPU, memory, disk, and container state against thresholds
-- **SignalR hub** -- broadcasts `SystemMetrics` (1s) and `ContainerList`/`ContainerStats` (2s)
+- **LinuxMetricsCollector** parses `/proc/stat`, `/proc/meminfo`, `/proc/net/dev`, `/proc/diskstats`, `/proc/1/mounts`, `/sys/class/thermal`, `/sys/class/hwmon`
+- **SystemInfoCollector** reads hostname, OS, kernel version, CPU model, total RAM (cached after first read)
+- **ProcessCollector** reads `/proc/[pid]/stat` and `/proc/[pid]/status` for top-N processes by CPU
+- **PodmanContainerService** HTTP client over Unix domain socket, compatible with the Docker and Podman API
+- **MetricsHistory** thread-safe ring buffer storing 86,400 snapshots (24 hours at 1/s)
+- **ContainerMetricsHistory** per-container ring buffer (300 samples) for sparkline data
+- **MetricsRepository** SQLite persistence with WAL mode, batch inserts, and automatic pruning
+- **ImageUpdateChecker** compares local image digests against remote registry manifests
+- **ServiceDiscovery** merges container labels and static config into the homepage service catalog
+- **AlertEvaluator** evaluates CPU, memory, disk, and container state against thresholds
+- **SignalR hub** broadcasts `SystemMetrics` (1s) and `ContainerList`/`ContainerStats` (2s)
 
 ### Frontend
 
@@ -304,7 +304,6 @@ Open **http://localhost:5050**. On Linux, Merlin reads real system metrics. On m
 dotnet test
 ```
 
-Tests use fixture data to simulate `/proc` and `/sys` files, so they run on any platform.
 
 ### Build container image
 
@@ -382,17 +381,17 @@ examples/
 
 ## Graceful Degradation
 
-Merlin is designed for resilience -- it is the thing you look at when everything else is broken.
+Merlin is designed for resilience. It is the thing you look at when everything else is broken.
 
-- **No container socket** -- container section shows "not available", system metrics still work
-- **No Discord webhook** -- alert system is not registered, everything else works
-- **No homepage config** -- homepage shows empty state with setup instructions
-- **No temperature sensors** -- temperature section is hidden
-- **Missing `/proc` files** -- affected metrics return zero, logged once as warning
-- **Network interface changes** -- handled dynamically
-- **Disk mount changes** -- handled dynamically
-- **SignalR disconnection** -- browser shows reconnecting indicator, auto-reconnects
-- **SQLite failure** -- falls back to in-memory data only
+- **No container socket** container section shows "not available", system metrics still work
+- **No Discord webhook** alert system is not registered, everything else works
+- **No homepage config** homepage shows empty state with setup instructions
+- **No temperature sensors** temperature section is hidden
+- **Missing `/proc` files** affected metrics return zero, logged once as warning
+- **Network interface changes** handled dynamically
+- **Disk mount changes** handled dynamically
+- **SignalR disconnection** browser shows reconnecting indicator, auto-reconnects
+- **SQLite failure** falls back to in-memory data only
 
 ## Contributing
 
