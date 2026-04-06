@@ -1,8 +1,7 @@
+# Rootful Podman
 services:
   merlin:
     image: ghcr.io/joachimgoris/merlin:latest
-    # For local development, replace the image line above with:
-    # build: .
     container_name: merlin
     network_mode: host
     volumes:
@@ -16,6 +15,9 @@ services:
     restart: unless-stopped
     security_opt:
       - label=disable
+
+# For rootless Podman, change the socket mount to:
+# - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/podman/podman.sock
 
 volumes:
   merlin-data:

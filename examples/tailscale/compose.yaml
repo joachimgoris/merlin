@@ -1,0 +1,37 @@
+# Merlin behind Tailscale — only accessible via your tailnet
+services:
+  merlin-ts:
+    image: tailscale/tailscale:latest
+    container_name: merlin-ts
+    hostname: merlin
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - merlin-ts-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+
+  merlin:
+    image: ghcr.io/joachimgoris/merlin:latest
+    container_name: merlin
+    network_mode: service:merlin-ts
+    depends_on:
+      - merlin-ts
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /run/podman/podman.sock:/var/run/podman/podman.sock
+      - merlin-data:/app/data
+    environment:
+      - HOST_ROOT_PATH=/host/root
+    restart: unless-stopped
+    security_opt:
+      - label=disable
+
+volumes:
+  merlin-data:
+  merlin-ts-state:

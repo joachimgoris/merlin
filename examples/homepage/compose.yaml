@@ -1,0 +1,30 @@
+services:
+  merlin:
+    image: ghcr.io/joachimgoris/merlin:latest
+    container_name: merlin
+    network_mode: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/podman/podman.sock
+      - merlin-data:/app/data
+      - ./homepage.json:/app/data/homepage.json:ro
+    environment:
+      - HOST_ROOT_PATH=/host/root
+    restart: unless-stopped
+
+  whoami:
+    image: traefik/whoami
+    container_name: whoami
+    ports:
+      - "8080:80"
+    labels:
+      merlin.homepage.name: "Whoami"
+      merlin.homepage.url: "http://localhost:8080"
+      merlin.homepage.icon: "👋"
+      merlin.homepage.group: "Demo"
+      merlin.homepage.description: "Simple HTTP service"
+
+volumes:
+  merlin-data:

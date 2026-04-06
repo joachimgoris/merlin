@@ -8,3 +8,6 @@ publish/
 *.swp
 *~
 .DS_Store
+.env
+*.db
+data/

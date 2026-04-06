@@ -1,21 +1,17 @@
 services:
   merlin:
     image: ghcr.io/joachimgoris/merlin:latest
-    # For local development, replace the image line above with:
-    # build: .
     container_name: merlin
     network_mode: host
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/host/root:ro
-      - /run/podman/podman.sock:/var/run/podman/podman.sock
+      - /var/run/docker.sock:/var/run/podman/podman.sock
       - merlin-data:/app/data
     environment:
       - HOST_ROOT_PATH=/host/root
     restart: unless-stopped
-    security_opt:
-      - label=disable
 
 volumes:
   merlin-data:
