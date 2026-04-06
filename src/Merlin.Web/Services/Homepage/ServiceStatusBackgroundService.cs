@@ -64,7 +64,7 @@ public sealed class ServiceStatusBackgroundService(
         try
         {
             var client = httpClientFactory.CreateClient("HomepageHealthCheck");
-            using var response = await client.GetAsync(service.Url, cancellationToken);
+            using var response = await client.GetAsync(service.EffectiveHealthUrl, cancellationToken);
             var status = response.IsSuccessStatusCode ? "online" : "offline";
             return service with { Status = status };
         }

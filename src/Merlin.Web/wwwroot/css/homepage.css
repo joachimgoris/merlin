@@ -39,9 +39,9 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 4px;
   background: linear-gradient(90deg, #5b9cf5, #c084fc);
-  opacity: 0.7;
+  opacity: 1;
   transition: opacity 0.3s;
 }
 
