@@ -52,15 +52,16 @@
           <span class="metric-card__label" id="cpu-heading">CPU</span>
           <span class="metric-card__sub" id="cpu-freq"></span>
         </div>
-        <div style="display: flex; align-items: center; gap: var(--space-6)">
+        <div class="gauge-layout">
           <svg class="gauge-ring" viewBox="0 0 140 140">
+            <circle class="gauge-ring__face" cx="70" cy="70" r="60" style="--glow-color: var(--color-accent-cpu)"/>
             <circle class="gauge-ring__track" cx="70" cy="70" r="60"/>
             <circle class="gauge-ring__fill" id="cpu-gauge-fill" cx="70" cy="70" r="60"
                     stroke="var(--color-accent-cpu)"
                     stroke-dasharray="377" stroke-dashoffset="377"/>
             <text class="gauge-ring__text" x="70" y="70" id="cpu-gauge-text">0%</text>
           </svg>
-          <div style="flex: 1">
+          <div class="gauge-layout__content">
             <div class="metric-card__sub">
               Load: <span id="cpu-load" style="color: var(--color-text)">0.00 / 0.00 / 0.00</span>
             </div>
@@ -75,15 +76,16 @@
         <div class="metric-card__header">
           <span class="metric-card__label" id="mem-heading">Memory</span>
         </div>
-        <div style="display: flex; align-items: center; gap: var(--space-6)">
+        <div class="gauge-layout">
           <svg class="gauge-ring" viewBox="0 0 140 140">
+            <circle class="gauge-ring__face" cx="70" cy="70" r="60" style="--glow-color: var(--color-accent-mem)"/>
             <circle class="gauge-ring__track" cx="70" cy="70" r="60"/>
             <circle class="gauge-ring__fill" id="mem-gauge-fill" cx="70" cy="70" r="60"
                     stroke="var(--color-accent-mem)"
                     stroke-dasharray="377" stroke-dashoffset="377"/>
             <text class="gauge-ring__text" x="70" y="70" id="mem-gauge-text">0%</text>
           </svg>
-          <div style="flex: 1">
+          <div class="gauge-layout__content">
             <div class="metric-card__sub">
               <span id="mem-used">0 GB</span> / <span id="mem-total">0 GB</span>
             </div>
@@ -133,6 +135,8 @@
         </div>
       </section>
     </div>
+
+    <div class="section-divider"></div>
 
     <!-- Processes -->
     <section class="process-section" id="process-section" aria-labelledby="process-heading">
@@ -213,19 +217,19 @@
     <div class="detail-drawer__stats" id="drawer-stats">
       <div class="detail-drawer__stat">
         <span class="detail-drawer__stat-label">CPU</span>
-        <span class="detail-drawer__stat-value" id="drawer-cpu">--</span>
+        <span class="detail-drawer__stat-value" id="drawer-cpu" data-metric="cpu">--</span>
       </div>
       <div class="detail-drawer__stat">
         <span class="detail-drawer__stat-label">Memory</span>
-        <span class="detail-drawer__stat-value" id="drawer-mem">--</span>
+        <span class="detail-drawer__stat-value" id="drawer-mem" data-metric="mem">--</span>
       </div>
       <div class="detail-drawer__stat">
         <span class="detail-drawer__stat-label">Net Tx</span>
-        <span class="detail-drawer__stat-value" id="drawer-net-tx">--</span>
+        <span class="detail-drawer__stat-value" id="drawer-net-tx" data-metric="net-tx">--</span>
       </div>
       <div class="detail-drawer__stat">
         <span class="detail-drawer__stat-label">Net Rx</span>
-        <span class="detail-drawer__stat-value" id="drawer-net-rx">--</span>
+        <span class="detail-drawer__stat-value" id="drawer-net-rx" data-metric="net-rx">--</span>
       </div>
     </div>
     <div class="detail-drawer__search">

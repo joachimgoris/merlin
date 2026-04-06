@@ -1,27 +1,32 @@
 :root {
   /* Background layers */
-  --color-bg: oklch(12% 0.01 260);
-  --color-surface: oklch(18% 0.015 260);
-  --color-surface-elevated: oklch(22% 0.02 260);
-  --color-surface-border: oklch(30% 0.02 260);
+  --color-bg: oklch(10% 0.02 270);
+  --color-surface: oklch(16% 0.02 265);
+  --color-surface-elevated: oklch(22% 0.025 265);
+  --color-surface-border: oklch(28% 0.025 265);
 
   /* Text */
   --color-text: oklch(92% 0 0);
   --color-text-secondary: oklch(65% 0 0);
   --color-text-muted: oklch(45% 0 0);
 
-  /* Metric accents */
-  --color-accent-cpu: oklch(75% 0.18 250);
-  --color-accent-mem: oklch(72% 0.2 310);
-  --color-accent-disk: oklch(78% 0.15 75);
-  --color-accent-net: oklch(78% 0.15 200);
-  --color-accent-temp: oklch(75% 0.2 30);
-  --color-accent-container: oklch(72% 0.16 280);
+  /* Metric accents — protanopia-friendly: blue, purple, amber, cyan */
+  --color-accent-cpu: oklch(75% 0.2 250);
+  --color-accent-mem: oklch(72% 0.22 310);
+  --color-accent-disk: oklch(80% 0.17 75);
+  --color-accent-net: oklch(80% 0.17 200);
+  --color-accent-temp: oklch(78% 0.22 55);
+  --color-accent-container: oklch(74% 0.18 280);
 
-  /* Status */
+  /* Status — protanopia-safe: bright vs dim, not red vs green */
   --color-success: oklch(75% 0.18 150);
-  --color-warning: oklch(78% 0.18 70);
+  --color-warning: oklch(80% 0.2 70);
   --color-danger: oklch(65% 0.25 25);
+
+  /* Ambient lighting & depth */
+  --color-glow-soft: oklch(60% 0.08 270 / 0.06);
+  --shadow-lg: 0 8px 32px oklch(0% 0 0 / 0.55), 0 2px 8px oklch(0% 0 0 / 0.3);
+  --gradient-surface: linear-gradient(135deg, var(--color-surface) 0%, oklch(19% 0.025 260) 100%);
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
