@@ -1,3 +1,25 @@
+/* System info bar */
+.system-info-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  padding: var(--space-2) var(--space-6);
+  border-bottom: 1px solid var(--color-surface-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.system-info-bar__item:not(:first-child) {
+  border-left: 1px solid var(--color-surface-border);
+  padding-left: var(--space-3);
+}
+
+.system-info-bar__item:empty {
+  display: none;
+}
+
 /* Metric Card */
 .metric-card {
   background: var(--color-surface);
@@ -212,6 +234,55 @@
 .temp-sensor__value--warm { color: var(--color-warning); }
 .temp-sensor__value--hot { color: var(--color-danger); }
 
+/* Compose group */
+.compose-group {
+  margin-bottom: var(--space-4);
+}
+
+.compose-group__header {
+  display: flex;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  align-items: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  margin-bottom: var(--space-3);
+}
+
+.compose-group__header:hover {
+  color: var(--color-text);
+}
+
+.compose-group__icon {
+  display: inline-block;
+  transition: transform 200ms;
+}
+
+.compose-group--collapsed .compose-group__icon {
+  transform: rotate(-90deg);
+}
+
+.compose-group--collapsed .compose-group__grid {
+  display: none;
+}
+
+.compose-group__name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.compose-group__count {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
 /* Container card */
 .container-card {
   background: var(--color-surface);
@@ -245,6 +316,43 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+}
+
+/* Health indicator */
+.health-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.health-indicator[data-health="healthy"] {
+  background: var(--color-success);
+}
+
+.health-indicator[data-health="unhealthy"] {
+  background: var(--color-danger);
+}
+
+.health-indicator[data-health="starting"] {
+  background: var(--color-warning);
+}
+
+.health-indicator[data-health="none"] {
+  display: none;
+}
+
+/* Drawer health value coloring */
+.detail-drawer__meta-value[data-health="healthy"] {
+  color: var(--color-success);
+}
+
+.detail-drawer__meta-value[data-health="unhealthy"] {
+  color: var(--color-danger);
+}
+
+.detail-drawer__meta-value[data-health="starting"] {
+  color: var(--color-warning);
 }
 
 .container-card__image {
@@ -569,10 +677,31 @@
 
 /* Empty state */
 .empty-state {
-  text-align: center;
-  padding: var(--space-12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  gap: var(--space-3);
+}
+
+.empty-state__icon {
+  width: 48px;
+  height: 48px;
   color: var(--color-text-muted);
+}
+
+.empty-state__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__description {
   font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  max-width: 360px;
+  text-align: center;
 }
 
 /* Process section */
@@ -689,4 +818,40 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 768px) {
+  /* Detail drawer: full viewport width on mobile */
+  .detail-drawer {
+    width: 100vw;
+  }
+
+  /* Process table: horizontal scroll on mobile */
+  .process-table-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Gauge rings: smaller on narrow screens */
+  .gauge-ring {
+    --size: 100px;
+    --stroke: 8;
+  }
+
+  .gauge-ring__text {
+    font-size: var(--text-lg);
+  }
+
+  /* Reduce flex gap between gauge ring and text content */
+  .metric-card > div[style] {
+    gap: var(--space-3) !important;
+  }
+
+  /* Container card sparklines: stack vertically */
+  .container-card__sparklines {
+    grid-template-columns: 1fr;
+  }
 }

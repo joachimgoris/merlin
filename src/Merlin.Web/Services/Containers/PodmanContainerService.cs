@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Merlin.Web.Models;
 
 namespace Merlin.Web.Services.Containers;
@@ -96,7 +97,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
                     ? DateTimeOffset.FromUnixTimeSeconds(c.StartedAt)
                     : created;
                 var uptime = c.State == "running" ? DateTimeOffset.UtcNow - startedAt : TimeSpan.Zero;
-                var health = c.Status ?? "unknown";
+                var health = ParseHealthFromStatus(c.Status);
 
                 var imageId = c.ImageId is { Length: >= 12 }
                     ? c.ImageId[..12]
@@ -104,9 +105,15 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
 
                 var version = ExtractVersion(c.Labels, c.Image);
 
+                var composeProject = c.Labels is not null
+                    && c.Labels.TryGetValue("com.docker.compose.project", out var proj)
+                    ? proj
+                    : "";
+
                 return new ContainerInfo(
                     c.Id, name, c.Image ?? "unknown", imageId, version,
-                    c.Status ?? "unknown", c.State ?? "unknown", health, created, uptime);
+                    c.Status ?? "unknown", c.State ?? "unknown", health, created, uptime,
+                    null, null, composeProject);
             }).ToList();
         }
         catch (Exception ex)
@@ -263,6 +270,72 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         finally
         {
             response?.Dispose();
+        }
+    }
+
+    private static readonly Regex HealthRegex = new(@"\((\w+)\)\s*$", RegexOptions.Compiled);
+
+    private static string ParseHealthFromStatus(string? status)
+    {
+        if (string.IsNullOrEmpty(status)) return "none";
+
+        var match = HealthRegex.Match(status);
+        if (!match.Success) return "none";
+
+        return match.Groups[1].Value.ToLowerInvariant() switch
+        {
+            "healthy" => "healthy",
+            "unhealthy" => "unhealthy",
+            "starting" => "starting",
+            _ => "none",
+        };
+    }
+
+    public async Task<object?> GetHealthDetailAsync(string id, CancellationToken ct = default)
+    {
+        if (!_socketAvailable) return null;
+
+        try
+        {
+            var response = await _client.GetAsync($"{ApiBase}/containers/{id}/json", ct);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("State", out var stateEl))
+                return new { health = "none", lastCheck = (string?)null, lastOutput = (string?)null };
+
+            if (!stateEl.TryGetProperty("Health", out var healthEl))
+                return new { health = "none", lastCheck = (string?)null, lastOutput = (string?)null };
+
+            var healthStatus = healthEl.TryGetProperty("Status", out var statusEl)
+                ? statusEl.GetString()?.ToLowerInvariant() ?? "none"
+                : "none";
+
+            string? lastCheck = null;
+            string? lastOutput = null;
+
+            if (healthEl.TryGetProperty("Log", out var logEl) && logEl.ValueKind == JsonValueKind.Array)
+            {
+                var logLength = logEl.GetArrayLength();
+                if (logLength > 0)
+                {
+                    var lastEntry = logEl[logLength - 1];
+                    if (lastEntry.TryGetProperty("Output", out var outputEl))
+                        lastOutput = outputEl.GetString()?.Trim();
+                    if (lastEntry.TryGetProperty("Start", out var startEl))
+                        lastCheck = startEl.GetString();
+                }
+            }
+
+            return new { health = healthStatus, lastCheck, lastOutput };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get health detail for container {Id}", id);
+            return new { health = "none", lastCheck = (string?)null, lastOutput = (string?)null };
         }
     }
 

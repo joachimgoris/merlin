@@ -35,8 +35,45 @@ function sortProcesses(processes, field, asc) {
   });
 }
 
+const processTableWrapper = document.getElementById('process-table-wrapper');
+let processEmptyEl = null;
+
+function ensureProcessEmpty() {
+  if (!processEmptyEl) {
+    processEmptyEl = document.createElement('div');
+    processEmptyEl.className = 'empty-state';
+    processEmptyEl.innerHTML = `
+      <svg class="empty-state__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="8" width="36" height="32" rx="3"/>
+        <line x1="6" y1="16" x2="42" y2="16"/>
+        <line x1="16" y1="8" x2="16" y2="16"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        <line x1="14" y1="24" x2="34" y2="24"/>
+        <line x1="14" y1="30" x2="28" y2="30"/>
+      </svg>
+      <span class="empty-state__title">No processes to display</span>
+      <span class="empty-state__description">Process data is not yet available.</span>`;
+  }
+  return processEmptyEl;
+}
+
 function renderRows(processes) {
   const sorted = sortProcesses(processes, sortField, sortAsc);
+
+  if (sorted.length === 0) {
+    const emptyEl = ensureProcessEmpty();
+    if (!processTableWrapper.contains(emptyEl)) {
+      processTableWrapper.appendChild(emptyEl);
+    }
+    table.style.display = 'none';
+    return;
+  }
+
+  table.style.display = '';
+  if (processEmptyEl && processTableWrapper.contains(processEmptyEl)) {
+    processTableWrapper.removeChild(processEmptyEl);
+  }
+
   const fragment = document.createDocumentFragment();
 
   for (const p of sorted) {

@@ -10,4 +10,7 @@ public sealed record ContainerInfo(
     string State,
     string Health,
     DateTimeOffset Created,
-    TimeSpan Uptime);
+    TimeSpan Uptime,
+    string? HealthLog,
+    DateTimeOffset? LastHealthCheck,
+    string ComposeProject);

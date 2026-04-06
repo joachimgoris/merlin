@@ -37,8 +37,14 @@ function setStatus(state) {
 }
 
 connection.onreconnecting(() => setStatus('reconnecting'));
-connection.onreconnected(() => setStatus('connected'));
-connection.onclose(() => setStatus('disconnected'));
+connection.onreconnected(() => {
+  setStatus('connected');
+  import('./toasts.js').then(({ showToast }) => showToast('Connection restored', 'info'));
+});
+connection.onclose(() => {
+  setStatus('disconnected');
+  import('./toasts.js').then(({ showToast }) => showToast('Connection lost', 'error'));
+});
 
 export async function start() {
   try {

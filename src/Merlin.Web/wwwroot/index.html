@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
+  <link rel="stylesheet" href="/css/toasts.css">
 </head>
 <body>
   <header class="header">
@@ -33,6 +34,14 @@
       <span id="uptime" style="margin-left: var(--space-4)"></span>
     </div>
   </header>
+
+  <div class="system-info-bar" id="system-info-bar" hidden>
+    <span class="system-info-bar__item" id="sysinfo-hostname"></span>
+    <span class="system-info-bar__item" id="sysinfo-os"></span>
+    <span class="system-info-bar__item" id="sysinfo-kernel"></span>
+    <span class="system-info-bar__item" id="sysinfo-cpu"></span>
+    <span class="system-info-bar__item" id="sysinfo-ram"></span>
+  </div>
 
   <main>
     <!-- System metrics grid -->
@@ -104,11 +113,24 @@
       </section>
 
       <!-- Temperature -->
-      <section class="metric-card section-full" style="--glow-color: var(--color-accent-temp); display: none" id="temp-section" aria-labelledby="temp-heading">
+      <section class="metric-card section-full" style="--glow-color: var(--color-accent-temp)" id="temp-section" aria-labelledby="temp-heading">
         <div class="metric-card__header">
           <span class="metric-card__label" id="temp-heading">Temperature</span>
         </div>
-        <div id="temp-sensors"></div>
+        <div id="temp-sensors">
+          <div class="empty-state" id="temp-empty">
+            <svg class="empty-state__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="19" y="4" width="10" height="32" rx="5"/>
+              <circle cx="24" cy="32" r="3" fill="currentColor" stroke="none"/>
+              <line x1="24" y1="16" x2="24" y2="29"/>
+              <line x1="32" y1="12" x2="35" y2="12"/>
+              <line x1="32" y1="18" x2="35" y2="18"/>
+              <line x1="32" y1="24" x2="35" y2="24"/>
+            </svg>
+            <span class="empty-state__title">No temperature sensors found</span>
+            <span class="empty-state__description">Your hardware may not expose thermal data, or /sys may not be mounted.</span>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -140,9 +162,17 @@
         <h2 class="containers-section__title" id="containers-heading">Containers</h2>
         <span class="metric-card__sub" id="container-count"></span>
       </div>
-      <div class="container-grid" id="container-grid"></div>
+      <div id="container-groups"></div>
       <div class="empty-state" id="container-empty" style="display: none">
-        No containers found. Is the Podman socket mounted?
+        <svg class="empty-state__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="8" y="14" width="32" height="24" rx="3"/>
+          <path d="M16 14V10a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v4"/>
+          <line x1="8" y1="24" x2="40" y2="24"/>
+          <circle cx="24" cy="19" r="1.5" fill="currentColor" stroke="none"/>
+          <circle cx="24" cy="31" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="empty-state__title">No containers found</span>
+        <span class="empty-state__description">Make sure the Podman socket is mounted and accessible.</span>
       </div>
     </section>
   </main>
@@ -174,6 +204,10 @@
         <span class="detail-drawer__meta-label">Uptime</span>
         <span class="detail-drawer__meta-value" id="drawer-uptime">--</span>
       </div>
+      <div class="detail-drawer__meta-row" id="drawer-health-row" hidden>
+        <span class="detail-drawer__meta-label">Health</span>
+        <span class="detail-drawer__meta-value" id="drawer-health">--</span>
+      </div>
     </div>
     <div class="detail-drawer__actions" id="drawer-actions"></div>
     <div class="detail-drawer__stats" id="drawer-stats">
@@ -200,6 +234,18 @@
     <div class="detail-drawer__logs" id="drawer-logs"></div>
   </aside>
 
+  <!-- Compose group template -->
+  <template id="compose-group-template">
+    <div class="compose-group" data-group="">
+      <button class="compose-group__header" aria-expanded="true">
+        <span class="compose-group__icon">&#x25BE;</span>
+        <span class="compose-group__name"></span>
+        <span class="compose-group__count"></span>
+      </button>
+      <div class="compose-group__grid container-grid"></div>
+    </div>
+  </template>
+
   <!-- Container card template -->
   <template id="container-card-template">
     <article class="container-card" data-container-id="">
@@ -207,6 +253,7 @@
       <div class="container-card__header">
         <span class="status-dot"></span>
         <span class="container-card__name"></span>
+        <span class="health-indicator" data-health="none" hidden></span>
       </div>
       <div class="container-card__image"></div>
       <div class="container-card__stats">
@@ -229,6 +276,8 @@
       </div>
     </article>
   </template>
+
+  <div id="toast-container" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
   <script type="module" src="/js/app.js"></script>

@@ -101,7 +101,8 @@ function updateSystemMetrics(m) {
 
   // Temperature
   if (m.temperature.sensors.length > 0) {
-    tempSection.style.display = '';
+    const tempEmpty = document.getElementById('temp-empty');
+    if (tempEmpty) tempEmpty.style.display = 'none';
     updateTempSensors(m.temperature.sensors);
   }
 }
@@ -126,6 +127,20 @@ function updateCoreBars(cores) {
 }
 
 function updateDiskMounts(mounts) {
+  if (mounts.length === 0) {
+    diskMounts.innerHTML = `
+      <div class="empty-state">
+        <svg class="empty-state__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="24" cy="12" rx="16" ry="6"/>
+          <path d="M8 12v24c0 3.3 7.2 6 16 6s16-2.7 16-6V12"/>
+          <path d="M8 24c0 3.3 7.2 6 16 6s16-2.7 16-6"/>
+        </svg>
+        <span class="empty-state__title">No disk mounts detected</span>
+        <span class="empty-state__description">The host filesystem may not be accessible from the container.</span>
+      </div>`;
+    return;
+  }
+
   // Rebuild if mount count changed
   if (diskMounts.children.length !== mounts.length) {
     diskMounts.innerHTML = '';
@@ -208,6 +223,24 @@ async function main() {
   hub.onImageUpdates(updateImageUpdates);
 
   await initProcessList();
+
+  // Fetch system info for header bar
+  try {
+    const sysInfoRes = await fetch('/api/system-info');
+    if (sysInfoRes.ok) {
+      const info = await sysInfoRes.json();
+      document.getElementById('sysinfo-hostname').textContent = info.hostname;
+      document.getElementById('sysinfo-os').textContent = info.os;
+      document.getElementById('sysinfo-kernel').textContent = info.kernel;
+      document.getElementById('sysinfo-cpu').textContent =
+        info.cpuModel ? `${info.cpuModel} (${info.cpuCores} cores)` : '';
+      document.getElementById('sysinfo-ram').textContent =
+        info.totalRamBytes > 0 ? formatBytes(info.totalRamBytes) : '';
+      document.getElementById('system-info-bar').removeAttribute('hidden');
+    }
+  } catch (e) {
+    console.warn('Failed to load system info:', e);
+  }
 
   // Fetch initial data
   try {

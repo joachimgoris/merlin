@@ -1,9 +1,11 @@
 import { startContainer, stopContainer, restartContainer, streamLogs } from './signalr-client.js';
 import { animateCardIn, animateCardOut, animateNumberTo, animateStaggeredGrid } from './animations.js';
 import { createSparkline } from './charts.js';
-const grid = document.getElementById('container-grid');
+import { showToast } from './toasts.js';
+const groupsContainer = document.getElementById('container-groups');
 const emptyState = document.getElementById('container-empty');
 const template = document.getElementById('container-card-template');
+const groupTemplate = document.getElementById('compose-group-template');
 const drawer = document.getElementById('detail-drawer');
 const overlay = document.getElementById('drawer-overlay');
 const drawerName = document.getElementById('drawer-name');
@@ -20,6 +22,8 @@ const drawerImageId = document.getElementById('drawer-image-id');
 const drawerStatus = document.getElementById('drawer-status');
 const drawerCreated = document.getElementById('drawer-created');
 const drawerUptime = document.getElementById('drawer-uptime');
+const drawerHealthRow = document.getElementById('drawer-health-row');
+const drawerHealth = document.getElementById('drawer-health');
 const countEl = document.getElementById('container-count');
 
 const cpuSparklineColor = getComputedStyle(document.documentElement)
@@ -45,6 +49,21 @@ let imageUpdateMap = new Map();
 
 /** Track whether the first batch of container cards has been rendered. */
 let containerFirstRender = true;
+
+/** @type {Map<string, boolean>} group name -> collapsed */
+const groupCollapseState = new Map();
+
+/** @type {Map<string, string>} container id -> previous state */
+const previousStates = new Map();
+
+/**
+ * Find a container card by ID across all group grids.
+ * @param {string} containerId
+ * @returns {HTMLElement|null}
+ */
+function findCard(containerId) {
+  return groupsContainer.querySelector(`[data-container-id="${containerId}"]`);
+}
 
 /**
  * Converts a byte-per-second value to a human-readable rate string.
@@ -78,50 +97,142 @@ export function updateContainerList(containers) {
 
   if (containers.length === 0) {
     emptyState.style.display = '';
-    grid.style.display = 'none';
+    groupsContainer.style.display = 'none';
     return;
   }
 
   emptyState.style.display = 'none';
-  grid.style.display = '';
+  groupsContainer.style.display = '';
 
   // Remove cards for containers that disappeared
   for (const [id] of currentContainers) {
     if (!incoming.has(id)) {
-      const card = grid.querySelector(`[data-container-id="${id}"]`);
+      const card = findCard(id);
       if (card) animateCardOut(card);
       destroyContainerSparklines(id);
       currentContainers.delete(id);
     }
   }
 
-  // Add or update cards
-  const newCards = [];
+  // Group containers by compose project
+  /** @type {Map<string, Array<[string, object]>>} */
+  const groups = new Map();
   for (const [id, container] of incoming) {
-    let card = grid.querySelector(`[data-container-id="${id}"]`);
+    const groupName = container.composeProject || 'Standalone';
+    if (!groups.has(groupName)) groups.set(groupName, []);
+    groups.get(groupName).push([id, container]);
+  }
 
-    if (!card) {
-      card = template.content.cloneNode(true).querySelector('.container-card');
-      card.dataset.containerId = id;
-      card.addEventListener('click', () => openDrawer(container));
-      grid.appendChild(card);
-      initContainerSparklines(id, card);
-      newCards.push(card);
+  const isSingleGroup = groups.size === 1;
+
+  // Track which group elements are still active
+  const activeGroupNames = new Set(groups.keys());
+
+  // Remove group wrappers that no longer have containers
+  for (const groupEl of [...groupsContainer.querySelectorAll('.compose-group')]) {
+    if (!activeGroupNames.has(groupEl.dataset.group)) {
+      groupEl.remove();
+    }
+  }
+
+  const newCards = [];
+
+  for (const [groupName, entries] of groups) {
+    // Find or create group wrapper
+    let groupEl = groupsContainer.querySelector(`.compose-group[data-group="${CSS.escape(groupName)}"]`);
+    if (!groupEl) {
+      groupEl = groupTemplate.content.cloneNode(true).querySelector('.compose-group');
+      groupEl.dataset.group = groupName;
+
+      // Restore collapse state
+      if (groupCollapseState.get(groupName)) {
+        groupEl.classList.add('compose-group--collapsed');
+        groupEl.querySelector('.compose-group__header').setAttribute('aria-expanded', 'false');
+      }
+
+      // Toggle handler
+      const header = groupEl.querySelector('.compose-group__header');
+      header.addEventListener('click', () => {
+        const collapsed = groupEl.classList.toggle('compose-group--collapsed');
+        groupCollapseState.set(groupName, collapsed);
+        header.setAttribute('aria-expanded', String(!collapsed));
+      });
+
+      groupsContainer.appendChild(groupEl);
     }
 
-    const dot = card.querySelector('.status-dot');
-    dot.className = `status-dot status-dot--${container.state}`;
+    const grid = groupEl.querySelector('.compose-group__grid');
 
-    card.querySelector('.container-card__name').textContent = container.name;
-    card.querySelector('.container-card__image').textContent = container.image;
+    // Update header info
+    const headerEl = groupEl.querySelector('.compose-group__header');
+    const groupRunning = entries.filter(([, c]) => c.state === 'running').length;
+    groupEl.querySelector('.compose-group__name').textContent = groupName;
+    groupEl.querySelector('.compose-group__count').textContent = `${groupRunning} / ${entries.length}`;
 
-    currentContainers.set(id, container);
+    // Hide header when there is only one group
+    headerEl.hidden = isSingleGroup;
+
+    // Add or update cards within this group
+    for (const [id, container] of entries) {
+      let card = findCard(id);
+
+      if (!card) {
+        card = template.content.cloneNode(true).querySelector('.container-card');
+        card.dataset.containerId = id;
+        card.addEventListener('click', () => openDrawer(container));
+        grid.appendChild(card);
+        initContainerSparklines(id, card);
+        newCards.push(card);
+      } else if (card.parentElement !== grid) {
+        // Container moved to a different group
+        grid.appendChild(card);
+      }
+
+      const dot = card.querySelector('.status-dot');
+      dot.className = `status-dot status-dot--${container.state}`;
+
+      card.querySelector('.container-card__name').textContent = container.name;
+      card.querySelector('.container-card__image').textContent = container.image;
+
+      const healthIndicator = card.querySelector('.health-indicator');
+      if (healthIndicator) {
+        const health = container.health || 'none';
+        healthIndicator.dataset.health = health;
+        healthIndicator.hidden = health === 'none' || health === 'unknown';
+      }
+
+      currentContainers.set(id, container);
+    }
+  }
+
+  // Detect container state changes and show toasts (skip first render)
+  if (!containerFirstRender || !newCards.length) {
+    for (const [id, container] of incoming) {
+      const prev = previousStates.get(id);
+      if (prev && prev !== container.state) {
+        const wasRunning = prev === 'running';
+        const isRunning = container.state === 'running';
+        const isStopped = container.state === 'exited' || container.state === 'stopped';
+
+        if (wasRunning && isStopped) {
+          showToast(`${container.name} has stopped`, 'warning');
+        } else if (!wasRunning && isRunning) {
+          showToast(`${container.name} is now running`, 'info');
+        }
+      }
+    }
+  }
+
+  // Update previous states for next comparison
+  previousStates.clear();
+  for (const [id, container] of incoming) {
+    previousStates.set(id, container.state);
   }
 
   // Staggered entrance for the first batch; individual animation for later additions
   if (containerFirstRender && newCards.length > 0) {
     containerFirstRender = false;
-    animateStaggeredGrid('#container-grid');
+    animateStaggeredGrid('#container-groups .compose-group__grid');
   } else {
     for (const card of newCards) {
       animateCardIn(card);
@@ -133,7 +244,7 @@ export function updateContainerList(containers) {
 
 export function updateContainerStats(stats) {
   for (const stat of stats) {
-    const card = grid.querySelector(`[data-container-id="${stat.containerId}"]`);
+    const card = findCard(stat.containerId);
     if (!card) continue;
 
     const cpuEl = card.querySelector('[data-stat="cpu"]');
@@ -233,6 +344,34 @@ function openDrawer(container) {
     ? new Date(container.created).toLocaleString()
     : '--';
   drawerUptime.textContent = formatUptime(container.uptime);
+
+  // Health info
+  const health = container.health || 'none';
+  if (health !== 'none' && health !== 'unknown') {
+    drawerHealthRow.hidden = false;
+    drawerHealth.textContent = health;
+    drawerHealth.dataset.health = health;
+
+    fetch(`/api/containers/${container.id}/health`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && openContainerId === container.id) {
+          const parts = [data.health];
+          if (data.lastCheck) {
+            parts.push(`checked ${new Date(data.lastCheck).toLocaleString()}`);
+          }
+          drawerHealth.textContent = parts.join(' \u2014 ');
+          if (data.lastOutput) {
+            drawerHealth.title = data.lastOutput;
+          }
+        }
+      })
+      .catch(() => { /* health detail fetch is best-effort */ });
+  } else {
+    drawerHealthRow.hidden = true;
+    drawerHealth.textContent = '--';
+  }
+
   drawerLogs.innerHTML = '';
   clearLogState();
 
@@ -361,7 +500,7 @@ export function updateImageUpdates(updates) {
  */
 function applyUpdateBadges() {
   for (const [id, container] of currentContainers) {
-    const card = grid.querySelector(`[data-container-id="${id}"]`);
+    const card = findCard(id);
     if (!card) continue;
 
     const badge = card.querySelector('.update-badge');

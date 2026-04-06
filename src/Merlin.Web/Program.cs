@@ -28,6 +28,7 @@ if (!Directory.Exists(hostSysPath) && Directory.Exists("/sys"))
     hostSysPath = "/sys";
 
 builder.Services.AddSingleton(new MetricsCollectorOptions(hostProcPath, hostSysPath, hostRootPath));
+builder.Services.AddSingleton<SystemInfoCollector>();
 builder.Services.AddSingleton<ISystemMetricsCollector, LinuxMetricsCollector>();
 builder.Services.AddSingleton<ProcessCollector>();
 builder.Services.AddSingleton<MetricsHistory>();
@@ -83,6 +84,12 @@ app.UseStaticFiles();
 app.MapHub<MetricsHub>("/hub/metrics");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow }));
+
+app.MapGet("/api/system-info", async (SystemInfoCollector collector, CancellationToken ct) =>
+{
+    var info = await collector.GetAsync(ct);
+    return Results.Ok(info);
+});
 
 app.MapGet("/api/metrics/current", (MetricsHistory history) =>
 {
@@ -186,6 +193,16 @@ app.MapPost("/api/containers/image-updates/check", async (
 {
     await updateService.ForceCheckAsync(ct);
     return Results.Ok(updateService.LatestResults.Values.ToList());
+});
+
+app.MapGet("/api/containers/{id}/health", async (string id, IContainerService containers, CancellationToken ct) =>
+{
+    if (containers is PodmanContainerService podman)
+    {
+        var detail = await podman.GetHealthDetailAsync(id, ct);
+        return detail is not null ? Results.Ok(detail) : Results.NotFound();
+    }
+    return Results.NotFound();
 });
 
 app.MapPost("/api/containers/{id}/start", async (string id, IContainerService containers, CancellationToken ct) =>

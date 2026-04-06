@@ -101,7 +101,22 @@ body {
     padding: var(--space-4);
   }
 
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
   .container-grid {
     grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: var(--space-2);
   }
 }
