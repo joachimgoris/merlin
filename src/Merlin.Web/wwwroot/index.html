@@ -11,7 +11,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css">
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/components.css">
@@ -199,9 +198,6 @@
       <input type="search" id="drawer-log-search" class="log-search-input" placeholder="Filter logs..." aria-label="Filter container logs">
     </div>
     <div class="detail-drawer__logs" id="drawer-logs"></div>
-    <div class="detail-drawer__terminal" id="drawer-terminal" hidden>
-      <div id="terminal-container"></div>
-    </div>
   </aside>
 
   <!-- Container card template -->
@@ -235,8 +231,6 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

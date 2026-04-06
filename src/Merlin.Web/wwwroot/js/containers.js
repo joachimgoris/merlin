@@ -1,8 +1,6 @@
 import { startContainer, stopContainer, restartContainer, streamLogs } from './signalr-client.js';
 import { animateCardIn, animateCardOut, animateNumberTo, animateStaggeredGrid } from './animations.js';
 import { createSparkline } from './charts.js';
-import { openTerminal, closeTerminal } from './terminal.js';
-
 const grid = document.getElementById('container-grid');
 const emptyState = document.getElementById('container-empty');
 const template = document.getElementById('container-card-template');
@@ -23,8 +21,6 @@ const drawerStatus = document.getElementById('drawer-status');
 const drawerCreated = document.getElementById('drawer-created');
 const drawerUptime = document.getElementById('drawer-uptime');
 const countEl = document.getElementById('container-count');
-const drawerTerminal = document.getElementById('drawer-terminal');
-const drawerSearch = document.querySelector('.detail-drawer__search');
 
 const cpuSparklineColor = getComputedStyle(document.documentElement)
   .getPropertyValue('--color-accent-cpu').trim() || '#60a5fa';
@@ -43,8 +39,6 @@ let cancelLogStream = null;
 let logBuffer = [];
 let logSearchQuery = '';
 let logSearchDebounceTimer = null;
-/** @type {'logs' | 'terminal'} */
-let drawerView = 'logs';
 
 /** @type {Map<string, boolean>} image reference -> update available */
 let imageUpdateMap = new Map();
@@ -227,29 +221,6 @@ function clearLogState() {
   logSearchInput.value = '';
 }
 
-/**
- * Switch the drawer to show the logs view.
- */
-function showLogsView() {
-  drawerView = 'logs';
-  closeTerminal();
-  drawerLogs.hidden = false;
-  drawerSearch.hidden = false;
-  drawerTerminal.hidden = true;
-}
-
-/**
- * Switch the drawer to show the terminal view.
- * @param {string} containerId
- */
-function showTerminalView(containerId) {
-  drawerView = 'terminal';
-  drawerLogs.hidden = true;
-  drawerSearch.hidden = true;
-  drawerTerminal.hidden = false;
-  openTerminal(containerId);
-}
-
 function openDrawer(container) {
   openContainerId = container.id;
   drawerName.textContent = container.name;
@@ -265,19 +236,11 @@ function openDrawer(container) {
   drawerLogs.innerHTML = '';
   clearLogState();
 
-  // Reset to logs view
-  drawerView = 'logs';
-  drawerLogs.hidden = false;
-  drawerSearch.hidden = false;
-  drawerTerminal.hidden = true;
-
   // Build actions
   drawerActions.innerHTML = '';
   if (container.state === 'running') {
     drawerActions.appendChild(makeButton('Stop', 'btn btn--danger', () => stopContainer(container.id)));
     drawerActions.appendChild(makeButton('Restart', 'btn', () => restartContainer(container.id)));
-    drawerActions.appendChild(makeButton('Terminal', 'btn btn--terminal', () => showTerminalView(container.id)));
-    drawerActions.appendChild(makeButton('Logs', 'btn btn--logs', () => showLogsView()));
   } else {
     drawerActions.appendChild(makeButton('Start', 'btn btn--success', () => startContainer(container.id)));
   }
@@ -316,9 +279,7 @@ function closeDrawer() {
   drawer.classList.remove('detail-drawer--open');
   overlay.classList.remove('overlay--visible');
   if (cancelLogStream) { cancelLogStream(); cancelLogStream = null; }
-  closeTerminal();
   clearLogState();
-  drawerView = 'logs';
 }
 
 function makeButton(text, className, onClick) {
