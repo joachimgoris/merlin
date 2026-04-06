@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Merlin.Web.Models;
@@ -12,6 +13,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     private readonly HttpClient _client;
     private readonly ILogger<PodmanContainerService> _logger;
     private readonly bool _socketAvailable;
+    private readonly string _socketPath;
     private const string ApiBase = "http://podman/v4.0.0";
 
     // Track previous CPU stats per container for delta calculation
@@ -29,6 +31,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
     public PodmanContainerService(ContainerServiceOptions options, ILogger<PodmanContainerService> logger)
     {
         _logger = logger;
+        _socketPath = options.SocketPath;
         // File.Exists returns false for Unix domain sockets; check via filesystem entry instead
         try
         {
@@ -291,21 +294,45 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         if (!_socketAvailable)
             throw new InvalidOperationException("Podman socket is not available.");
 
-        var body = new { Detach = false, Tty = true };
-        var content = new StringContent(
-            JsonSerializer.Serialize(body),
-            System.Text.Encoding.UTF8,
-            "application/json");
+        // We need a raw bidirectional stream — HttpClient only gives us a read-only
+        // content stream. So we open a direct socket connection and do the HTTP
+        // request manually to get the underlying NetworkStream for both read and write.
+        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        await socket.ConnectAsync(new UnixDomainSocketEndPoint(_socketPath), ct);
+        var networkStream = new NetworkStream(socket, ownsSocket: true);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBase}/exec/{execId}/start")
+        var bodyJson = JsonSerializer.Serialize(new { Detach = false, Tty = true });
+        var httpRequest = $"POST {ApiBase}/exec/{execId}/start HTTP/1.1\r\n" +
+                          $"Host: podman\r\n" +
+                          $"Content-Type: application/json\r\n" +
+                          $"Content-Length: {Encoding.UTF8.GetByteCount(bodyJson)}\r\n" +
+                          $"\r\n" +
+                          bodyJson;
+
+        var requestBytes = Encoding.UTF8.GetBytes(httpRequest);
+        await networkStream.WriteAsync(requestBytes, ct);
+        await networkStream.FlushAsync(ct);
+
+        // Read the HTTP response headers (consume until \r\n\r\n)
+        var headerBuf = new byte[1];
+        var headerBuilder = new StringBuilder();
+        var headerEnd = "\r\n\r\n";
+        while (!headerBuilder.ToString().EndsWith(headerEnd))
         {
-            Content = content,
-        };
+            var read = await networkStream.ReadAsync(headerBuf, ct);
+            if (read == 0) throw new InvalidOperationException("Connection closed while reading exec response headers.");
+            headerBuilder.Append((char)headerBuf[0]);
+        }
 
-        var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
+        var headers = headerBuilder.ToString();
+        if (!headers.StartsWith("HTTP/1.1 2") && !headers.StartsWith("HTTP/1.0 2"))
+        {
+            networkStream.Dispose();
+            throw new InvalidOperationException($"Exec start failed: {headers.Split('\r')[0]}");
+        }
 
-        return await response.Content.ReadAsStreamAsync(ct);
+        // The remaining stream is the raw bidirectional TTY
+        return networkStream;
     }
 
     public async Task ResizeExecAsync(string execId, int cols, int rows, CancellationToken ct = default)
