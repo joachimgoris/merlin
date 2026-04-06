@@ -31,18 +31,18 @@ public sealed class ServiceStatusBackgroundService(
         }
     }
 
-    private async Task RunCycleAsync(CancellationToken ct)
+    private async Task RunCycleAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var containers = await containerService.ListContainersAsync(ct);
+            var containers = await containerService.ListContainersAsync(cancellationToken);
             var services = serviceDiscovery.DiscoverServices(containers);
 
-            var healthCheckedServices = await HealthCheckAllAsync(services, ct);
+            var healthCheckedServices = await HealthCheckAllAsync(services, cancellationToken);
 
             _currentServices = healthCheckedServices;
 
-            await hubContext.Clients.All.SendAsync("HomepageServices", healthCheckedServices, ct);
+            await hubContext.Clients.All.SendAsync("HomepageServices", healthCheckedServices, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -52,19 +52,19 @@ public sealed class ServiceStatusBackgroundService(
 
     private async Task<List<HomepageService>> HealthCheckAllAsync(
         List<HomepageService> services,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        var tasks = services.Select(service => HealthCheckOneAsync(service, ct));
+        var tasks = services.Select(service => HealthCheckOneAsync(service, cancellationToken));
         var results = await Task.WhenAll(tasks);
         return [.. results];
     }
 
-    private async Task<HomepageService> HealthCheckOneAsync(HomepageService service, CancellationToken ct)
+    private async Task<HomepageService> HealthCheckOneAsync(HomepageService service, CancellationToken cancellationToken)
     {
         try
         {
             var client = httpClientFactory.CreateClient("HomepageHealthCheck");
-            using var response = await client.GetAsync(service.Url, ct);
+            using var response = await client.GetAsync(service.Url, cancellationToken);
             var status = response.IsSuccessStatusCode ? "online" : "offline";
             return service with { Status = status };
         }

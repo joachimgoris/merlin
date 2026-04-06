@@ -8,28 +8,28 @@ public sealed class SystemInfoCollector(
 {
     private SystemInfo? _cached;
 
-    public async Task<SystemInfo> GetAsync(CancellationToken ct = default)
+    public async Task<SystemInfo> GetAsync(CancellationToken cancellationToken = default)
     {
         if (_cached is not null)
             return _cached;
 
-        var hostname = await ReadHostnameAsync(ct);
-        var os = await ReadOsNameAsync(ct);
-        var kernel = await ReadKernelVersionAsync(ct);
-        var (cpuModel, cpuCores) = await ReadCpuInfoAsync(ct);
-        var totalRam = await ReadTotalRamAsync(ct);
+        var hostname = await ReadHostnameAsync(cancellationToken);
+        var os = await ReadOsNameAsync(cancellationToken);
+        var kernel = await ReadKernelVersionAsync(cancellationToken);
+        var (cpuModel, cpuCores) = await ReadCpuInfoAsync(cancellationToken);
+        var totalRam = await ReadTotalRamAsync(cancellationToken);
 
         _cached = new SystemInfo(hostname, os, kernel, cpuModel, cpuCores, totalRam);
         return _cached;
     }
 
-    private async Task<string> ReadHostnameAsync(CancellationToken ct)
+    private async Task<string> ReadHostnameAsync(CancellationToken cancellationToken)
     {
         try
         {
             var path = Path.Combine(options.ProcPath, "sys", "kernel", "hostname");
             if (File.Exists(path))
-                return (await File.ReadAllTextAsync(path, ct)).Trim();
+                return (await File.ReadAllTextAsync(path, cancellationToken)).Trim();
         }
         catch (Exception ex)
         {
@@ -47,7 +47,7 @@ public sealed class SystemInfoCollector(
         }
     }
 
-    private async Task<string> ReadOsNameAsync(CancellationToken ct)
+    private async Task<string> ReadOsNameAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -58,7 +58,7 @@ public sealed class SystemInfoCollector(
             if (!File.Exists(path))
                 return string.Empty;
 
-            var lines = await File.ReadAllLinesAsync(path, ct);
+            var lines = await File.ReadAllLinesAsync(path, cancellationToken);
             foreach (var line in lines)
             {
                 if (line.StartsWith("PRETTY_NAME=", StringComparison.Ordinal))
@@ -76,7 +76,7 @@ public sealed class SystemInfoCollector(
         return string.Empty;
     }
 
-    private async Task<string> ReadKernelVersionAsync(CancellationToken ct)
+    private async Task<string> ReadKernelVersionAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -84,7 +84,7 @@ public sealed class SystemInfoCollector(
             if (!File.Exists(path))
                 return string.Empty;
 
-            var text = (await File.ReadAllTextAsync(path, ct)).Trim();
+            var text = (await File.ReadAllTextAsync(path, cancellationToken)).Trim();
             // /proc/version typically starts with "Linux version X.Y.Z ..."
             var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             return parts.Length >= 3 ? parts[2] : text;
@@ -96,7 +96,7 @@ public sealed class SystemInfoCollector(
         }
     }
 
-    private async Task<(string Model, int Cores)> ReadCpuInfoAsync(CancellationToken ct)
+    private async Task<(string Model, int Cores)> ReadCpuInfoAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -104,7 +104,7 @@ public sealed class SystemInfoCollector(
             if (!File.Exists(path))
                 return (string.Empty, 0);
 
-            var lines = await File.ReadAllLinesAsync(path, ct);
+            var lines = await File.ReadAllLinesAsync(path, cancellationToken);
             var model = string.Empty;
             var coreCount = 0;
 
@@ -131,7 +131,7 @@ public sealed class SystemInfoCollector(
         }
     }
 
-    private async Task<long> ReadTotalRamAsync(CancellationToken ct)
+    private async Task<long> ReadTotalRamAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -139,7 +139,7 @@ public sealed class SystemInfoCollector(
             if (!File.Exists(path))
                 return 0;
 
-            var lines = await File.ReadAllLinesAsync(path, ct);
+            var lines = await File.ReadAllLinesAsync(path, cancellationToken);
             foreach (var line in lines)
             {
                 if (line.StartsWith("MemTotal:", StringComparison.Ordinal))

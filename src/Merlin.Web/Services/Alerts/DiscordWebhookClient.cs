@@ -14,7 +14,7 @@ public sealed class DiscordWebhookClient(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public async Task SendAlertAsync(Alert alert, string hostname, CancellationToken ct)
+    public async Task SendAlertAsync(Alert alert, string hostname, CancellationToken cancellationToken)
     {
         try
         {
@@ -58,7 +58,7 @@ public sealed class DiscordWebhookClient(
 
             var json = JsonSerializer.Serialize(payload, JsonOptions);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
-            using var response = await httpClient.PostAsync(options.WebhookUrl, content, ct);
+            using var response = await httpClient.PostAsync(options.WebhookUrl, content, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

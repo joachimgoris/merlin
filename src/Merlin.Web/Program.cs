@@ -115,9 +115,9 @@ app.MapHub<MetricsHub>("/hub/metrics");
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow }));
 
-app.MapGet("/api/system-info", async (SystemInfoCollector collector, CancellationToken ct) =>
+app.MapGet("/api/system-info", async (SystemInfoCollector collector, CancellationToken cancellationToken) =>
 {
-    var info = await collector.GetAsync(ct);
+    var info = await collector.GetAsync(cancellationToken);
     return Results.Ok(info);
 });
 
@@ -131,7 +131,7 @@ app.MapGet("/api/metrics/history", async (
     MetricsHistory history,
     MetricsRepository repository,
     int minutes = 60,
-    CancellationToken ct = default) =>
+    CancellationToken cancellationToken = default) =>
 {
     const int maxMinutes = 10_080; // 7 days
     minutes = Math.Clamp(minutes, 1, maxMinutes);
@@ -153,7 +153,7 @@ app.MapGet("/api/metrics/history", async (
     IReadOnlyList<Merlin.Web.Models.SystemMetrics> persisted;
     try
     {
-        persisted = await repository.GetRangeAsync(from, to, ct);
+        persisted = await repository.GetRangeAsync(from, to, cancellationToken);
     }
     catch (Exception)
     {
@@ -177,16 +177,16 @@ app.MapGet("/api/metrics/history", async (
     return Results.Ok(merged);
 });
 
-app.MapGet("/api/processes", async (ProcessCollector processCollector, int top = 25, CancellationToken ct = default) =>
+app.MapGet("/api/processes", async (ProcessCollector processCollector, int top = 25, CancellationToken cancellationToken = default) =>
 {
-    var processes = await processCollector.CollectAsync(top, ct);
+    var processes = await processCollector.CollectAsync(top, cancellationToken);
     return Results.Ok(processes);
 });
 
-app.MapGet("/api/containers", async (IContainerService containers, CancellationToken ct) =>
+app.MapGet("/api/containers", async (IContainerService containers, CancellationToken cancellationToken) =>
 {
-    var list = await containers.ListContainersAsync(ct);
-    var stats = await containers.GetAllStatsAsync(ct);
+    var list = await containers.ListContainersAsync(cancellationToken);
+    var stats = await containers.GetAllStatsAsync(cancellationToken);
     return Results.Ok(new { containers = list, stats });
 });
 
@@ -219,37 +219,37 @@ app.MapGet("/api/containers/image-updates", (ImageUpdateBackgroundService update
 
 app.MapPost("/api/containers/image-updates/check", async (
     ImageUpdateBackgroundService updateService,
-    CancellationToken ct) =>
+    CancellationToken cancellationToken) =>
 {
-    await updateService.ForceCheckAsync(ct);
+    await updateService.ForceCheckAsync(cancellationToken);
     return Results.Ok(updateService.LatestResults.Values.ToList());
 });
 
-app.MapGet("/api/containers/{id}/health", async (string id, IContainerService containers, CancellationToken ct) =>
+app.MapGet("/api/containers/{id}/health", async (string id, IContainerService containers, CancellationToken cancellationToken) =>
 {
     if (containers is PodmanContainerService podman)
     {
-        var detail = await podman.GetHealthDetailAsync(id, ct);
+        var detail = await podman.GetHealthDetailAsync(id, cancellationToken);
         return detail is not null ? Results.Ok(detail) : Results.NotFound();
     }
     return Results.NotFound();
 });
 
-app.MapPost("/api/containers/{id}/start", async (string id, IContainerService containers, CancellationToken ct) =>
+app.MapPost("/api/containers/{id}/start", async (string id, IContainerService containers, CancellationToken cancellationToken) =>
 {
-    await containers.StartAsync(id, ct);
+    await containers.StartAsync(id, cancellationToken);
     return Results.Ok();
 });
 
-app.MapPost("/api/containers/{id}/stop", async (string id, IContainerService containers, CancellationToken ct) =>
+app.MapPost("/api/containers/{id}/stop", async (string id, IContainerService containers, CancellationToken cancellationToken) =>
 {
-    await containers.StopAsync(id, ct);
+    await containers.StopAsync(id, cancellationToken);
     return Results.Ok();
 });
 
-app.MapPost("/api/containers/{id}/restart", async (string id, IContainerService containers, CancellationToken ct) =>
+app.MapPost("/api/containers/{id}/restart", async (string id, IContainerService containers, CancellationToken cancellationToken) =>
 {
-    await containers.RestartAsync(id, ct);
+    await containers.RestartAsync(id, cancellationToken);
     return Results.Ok();
 });
 

@@ -20,10 +20,10 @@ public sealed class ImageUpdateBackgroundService(
 
     public IReadOnlyDictionary<string, ImageUpdateStatus> LatestResults => _latestResults;
 
-    public async Task ForceCheckAsync(CancellationToken ct)
+    public async Task ForceCheckAsync(CancellationToken cancellationToken)
     {
         updateChecker.ClearCache();
-        await RunCheckAsync(ct);
+        await RunCheckAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -88,17 +88,17 @@ public sealed class ImageUpdateBackgroundService(
         }
     }
 
-    private async Task RunCheckAsync(CancellationToken ct)
+    private async Task RunCheckAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var containers = await containerService.ListContainersAsync(ct);
+            var containers = await containerService.ListContainersAsync(cancellationToken);
             var running = containers.Where(c => c.State == "running").ToList();
 
             if (running.Count == 0)
             {
                 _latestResults.Clear();
-                await hubContext.Clients.All.SendAsync("ImageUpdates", Array.Empty<ImageUpdateStatus>(), ct);
+                await hubContext.Clients.All.SendAsync("ImageUpdates", Array.Empty<ImageUpdateStatus>(), cancellationToken);
                 return;
             }
 
@@ -109,7 +109,7 @@ public sealed class ImageUpdateBackgroundService(
                 _knownImageIds[c.Image] = c.ImageId;
             }
 
-            var results = await updateChecker.CheckUpdatesAsync(running, ct);
+            var results = await updateChecker.CheckUpdatesAsync(running, cancellationToken);
 
             _latestResults.Clear();
             foreach (var result in results)
@@ -117,7 +117,7 @@ public sealed class ImageUpdateBackgroundService(
                 _latestResults[result.ImageReference] = result;
             }
 
-            await hubContext.Clients.All.SendAsync("ImageUpdates", results, ct);
+            await hubContext.Clients.All.SendAsync("ImageUpdates", results, cancellationToken);
             logger.LogDebug("Image update check completed: {Count} images checked", results.Count);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

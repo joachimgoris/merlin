@@ -12,29 +12,29 @@ public sealed class LinuxMetricsCollector(
     private Dictionary<string, (long read, long write)>? _prevDiskSectors;
     private DateTimeOffset _prevTimestamp = DateTimeOffset.UtcNow;
 
-    public async Task<SystemMetrics> CollectAsync(CancellationToken ct = default)
+    public async Task<SystemMetrics> CollectAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
         var elapsed = (now - _prevTimestamp).TotalSeconds;
         if (elapsed <= 0) elapsed = 1;
 
-        var cpu = await CollectCpuAsync(elapsed, ct);
-        var memory = await CollectMemoryAsync(ct);
-        var disk = await CollectDiskAsync(elapsed, ct);
-        var network = await CollectNetworkAsync(elapsed, ct);
-        var temperature = await CollectTemperatureAsync(ct);
+        var cpu = await CollectCpuAsync(elapsed, cancellationToken);
+        var memory = await CollectMemoryAsync(cancellationToken);
+        var disk = await CollectDiskAsync(elapsed, cancellationToken);
+        var network = await CollectNetworkAsync(elapsed, cancellationToken);
+        var temperature = await CollectTemperatureAsync(cancellationToken);
 
         _prevTimestamp = now;
 
         return new SystemMetrics(cpu, memory, disk, network, temperature, now);
     }
 
-    private async Task<CpuMetrics> CollectCpuAsync(double elapsed, CancellationToken ct)
+    private async Task<CpuMetrics> CollectCpuAsync(double elapsed, CancellationToken cancellationToken)
     {
         try
         {
-            var statLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "stat"), ct);
-            var loadAvgLine = await File.ReadAllTextAsync(Path.Combine(options.ProcPath, "loadavg"), ct);
+            var statLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "stat"), cancellationToken);
+            var loadAvgLine = await File.ReadAllTextAsync(Path.Combine(options.ProcPath, "loadavg"), cancellationToken);
 
             var totalUsage = 0.0;
             var perCore = new List<double>();
@@ -73,7 +73,7 @@ public sealed class LinuxMetricsCollector(
             var load5 = loadParts.Length > 1 ? ParseDouble(loadParts[1]) : 0;
             var load15 = loadParts.Length > 2 ? ParseDouble(loadParts[2]) : 0;
 
-            var freqMhz = await ReadCpuFrequencyAsync(ct);
+            var freqMhz = await ReadCpuFrequencyAsync(cancellationToken);
 
             return new CpuMetrics(totalUsage, perCore, load1, load5, load15, freqMhz);
         }
@@ -84,11 +84,11 @@ public sealed class LinuxMetricsCollector(
         }
     }
 
-    private async Task<double> ReadCpuFrequencyAsync(CancellationToken ct)
+    private async Task<double> ReadCpuFrequencyAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "cpuinfo"), ct);
+            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "cpuinfo"), cancellationToken);
             var maxFreq = 0.0;
             foreach (var line in lines)
             {
@@ -143,11 +143,11 @@ public sealed class LinuxMetricsCollector(
         return Math.Clamp((1.0 - (double)idleDelta / totalDelta) * 100, 0, 100);
     }
 
-    private async Task<MemoryMetrics> CollectMemoryAsync(CancellationToken ct)
+    private async Task<MemoryMetrics> CollectMemoryAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "meminfo"), ct);
+            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "meminfo"), cancellationToken);
             var values = new Dictionary<string, long>();
 
             foreach (var line in lines)
@@ -179,7 +179,7 @@ public sealed class LinuxMetricsCollector(
         }
     }
 
-    private async Task<DiskMetrics> CollectDiskAsync(double elapsed, CancellationToken ct)
+    private async Task<DiskMetrics> CollectDiskAsync(double elapsed, CancellationToken cancellationToken)
     {
         try
         {
@@ -190,10 +190,10 @@ public sealed class LinuxMetricsCollector(
             if (!File.Exists(mountsFile))
                 mountsFile = Path.Combine(options.ProcPath, "mounts");
 
-            var mountLines = await File.ReadAllLinesAsync(mountsFile, ct);
+            var mountLines = await File.ReadAllLinesAsync(mountsFile, cancellationToken);
 
             // Read diskstats for I/O rates
-            var diskStatsLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "diskstats"), ct);
+            var diskStatsLines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "diskstats"), cancellationToken);
             var currentDiskSectors = ParseDiskStats(diskStatsLines);
 
             var pseudoFs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -278,11 +278,11 @@ public sealed class LinuxMetricsCollector(
         return result;
     }
 
-    private async Task<NetworkMetrics> CollectNetworkAsync(double elapsed, CancellationToken ct)
+    private async Task<NetworkMetrics> CollectNetworkAsync(double elapsed, CancellationToken cancellationToken)
     {
         try
         {
-            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "net", "dev"), ct);
+            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "net", "dev"), cancellationToken);
             var interfaces = new List<NetworkInterfaceMetrics>();
             var currentBytes = new Dictionary<string, (long rx, long tx)>();
 
@@ -322,7 +322,7 @@ public sealed class LinuxMetricsCollector(
         }
     }
 
-    private async Task<TemperatureMetrics> CollectTemperatureAsync(CancellationToken ct)
+    private async Task<TemperatureMetrics> CollectTemperatureAsync(CancellationToken cancellationToken)
     {
         var sensors = new List<TemperatureSensor>();
 
@@ -339,9 +339,9 @@ public sealed class LinuxMetricsCollector(
 
                     if (!File.Exists(tempFile)) continue;
 
-                    var tempStr = (await File.ReadAllTextAsync(tempFile, ct)).Trim();
+                    var tempStr = (await File.ReadAllTextAsync(tempFile, cancellationToken)).Trim();
                     var label = File.Exists(typeFile)
-                        ? (await File.ReadAllTextAsync(typeFile, ct)).Trim()
+                        ? (await File.ReadAllTextAsync(typeFile, cancellationToken)).Trim()
                         : Path.GetFileName(zone);
 
                     if (long.TryParse(tempStr, out var milliDegrees))
@@ -364,14 +364,14 @@ public sealed class LinuxMetricsCollector(
                         var labelFile = Path.Combine(hwmon, $"{prefix}_label");
                         var critFile = Path.Combine(hwmon, $"{prefix}_crit");
 
-                        var tempStr = (await File.ReadAllTextAsync(tempFile, ct)).Trim();
+                        var tempStr = (await File.ReadAllTextAsync(tempFile, cancellationToken)).Trim();
                         var label = File.Exists(labelFile)
-                            ? (await File.ReadAllTextAsync(labelFile, ct)).Trim()
+                            ? (await File.ReadAllTextAsync(labelFile, cancellationToken)).Trim()
                             : prefix;
 
                         double? critical = null;
                         if (File.Exists(critFile) &&
-                            long.TryParse((await File.ReadAllTextAsync(critFile, ct)).Trim(), out var critMilliDeg))
+                            long.TryParse((await File.ReadAllTextAsync(critFile, cancellationToken)).Trim(), out var critMilliDeg))
                         {
                             critical = critMilliDeg / 1000.0;
                         }

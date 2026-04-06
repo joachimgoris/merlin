@@ -65,10 +65,10 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
 
         var handler = new SocketsHttpHandler
         {
-            ConnectCallback = async (context, ct) =>
+            ConnectCallback = async (context, cancellationToken) =>
             {
                 var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-                await socket.ConnectAsync(new UnixDomainSocketEndPoint(options.SocketPath), ct);
+                await socket.ConnectAsync(new UnixDomainSocketEndPoint(options.SocketPath), cancellationToken);
                 return new NetworkStream(socket, ownsSocket: true);
             },
         };
@@ -76,16 +76,16 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         _client = new HttpClient(handler) { BaseAddress = new Uri(ApiBase) };
     }
 
-    public async Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return [];
 
         try
         {
-            var response = await _client.GetAsync($"{ApiBase}/containers/json?all=true", ct);
+            var response = await _client.GetAsync($"{ApiBase}/containers/json?all=true", cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var containers = JsonSerializer.Deserialize<List<PodmanContainer>>(json, JsonOptions) ?? [];
 
             return [.. containers.Select(c =>
@@ -128,16 +128,16 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         }
     }
 
-    public async Task<IReadOnlyList<ContainerStats>> GetAllStatsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ContainerStats>> GetAllStatsAsync(CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return [];
 
         try
         {
-            var containers = await ListContainersAsync(ct);
+            var containers = await ListContainersAsync(cancellationToken);
             var running = containers.Where(c => c.State == "running").ToList();
 
-            var tasks = running.Select(c => GetContainerStatsAsync(c.Id, c.Name, ct));
+            var tasks = running.Select(c => GetContainerStatsAsync(c.Id, c.Name, cancellationToken));
             var results = await Task.WhenAll(tasks);
 
             return [.. results.Where(r => r is not null).Cast<ContainerStats>()];
@@ -149,14 +149,14 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         }
     }
 
-    private async Task<ContainerStats?> GetContainerStatsAsync(string id, string name, CancellationToken ct)
+    private async Task<ContainerStats?> GetContainerStatsAsync(string id, string name, CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _client.GetAsync($"{ApiBase}/containers/{id}/stats?stream=false&one-shot=true", ct);
+            var response = await _client.GetAsync($"{ApiBase}/containers/{id}/stats?stream=false&one-shot=true", cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var stats = JsonSerializer.Deserialize<PodmanStats>(json, JsonOptions);
             if (stats is null) return null;
 
@@ -216,32 +216,32 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         }
     }
 
-    public async Task StartAsync(string id, CancellationToken ct = default)
+    public async Task StartAsync(string id, CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return;
-        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/start", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/start", null, cancellationToken);
         if ((int)response.StatusCode != 304) // 304 = already started
             response.EnsureSuccessStatusCode();
     }
 
-    public async Task StopAsync(string id, CancellationToken ct = default)
+    public async Task StopAsync(string id, CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return;
-        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/stop", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/stop", null, cancellationToken);
         if ((int)response.StatusCode != 304) // 304 = already stopped
             response.EnsureSuccessStatusCode();
     }
 
-    public async Task RestartAsync(string id, CancellationToken ct = default)
+    public async Task RestartAsync(string id, CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return;
-        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/restart", null, ct);
+        using var response = await _client.PostAsync($"{ApiBase}/containers/{id}/restart", null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public async IAsyncEnumerable<string> StreamLogsAsync(
         string id, int tail = 100,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) yield break;
 
@@ -250,15 +250,15 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         {
             response = await _client.GetAsync(
                 $"{ApiBase}/containers/{id}/logs?follow=true&stdout=true&stderr=true&tail={tail}",
-                HttpCompletionOption.ResponseHeadersRead, ct);
+                HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             response.EnsureSuccessStatusCode();
-            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
 
-            while (!ct.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(ct);
+                var line = await reader.ReadLineAsync(cancellationToken);
                 if (line is null) break;
 
                 // Podman log frames may have an 8-byte header; strip it if present
@@ -296,16 +296,16 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         };
     }
 
-    public async Task<object?> GetHealthDetailAsync(string id, CancellationToken ct = default)
+    public async Task<object?> GetHealthDetailAsync(string id, CancellationToken cancellationToken = default)
     {
         if (!_socketAvailable) return null;
 
         try
         {
-            var response = await _client.GetAsync($"{ApiBase}/containers/{id}/json", ct);
+            var response = await _client.GetAsync($"{ApiBase}/containers/{id}/json", cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 

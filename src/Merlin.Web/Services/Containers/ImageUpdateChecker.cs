@@ -59,14 +59,14 @@ public sealed class ImageUpdateChecker : IDisposable
         {
             var handler = new SocketsHttpHandler
             {
-                ConnectCallback = async (context, ct) =>
+                ConnectCallback = async (context, cancellationToken) =>
                 {
                     var socket = new System.Net.Sockets.Socket(
                         System.Net.Sockets.AddressFamily.Unix,
                         System.Net.Sockets.SocketType.Stream,
                         System.Net.Sockets.ProtocolType.Unspecified);
                     await socket.ConnectAsync(
-                        new System.Net.Sockets.UnixDomainSocketEndPoint(options.SocketPath), ct);
+                        new System.Net.Sockets.UnixDomainSocketEndPoint(options.SocketPath), cancellationToken);
                     return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
                 },
             };
@@ -86,7 +86,7 @@ public sealed class ImageUpdateChecker : IDisposable
 
     public async Task<IReadOnlyList<ImageUpdateStatus>> CheckUpdatesAsync(
         IReadOnlyList<ContainerInfo> containers,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
         if (!_socketAvailable) return [];
 
@@ -96,7 +96,7 @@ public sealed class ImageUpdateChecker : IDisposable
             .Distinct()
             .ToList();
 
-        var tasks = uniqueImages.Select(image => CheckSingleImageAsync(image, ct));
+        var tasks = uniqueImages.Select(image => CheckSingleImageAsync(image, cancellationToken));
         var results = await Task.WhenAll(tasks);
 
         return results.ToList();
@@ -228,15 +228,15 @@ public sealed class ImageUpdateChecker : IDisposable
         }
     }
 
-    private async Task<string?> GetDockerHubTokenAsync(string repository, CancellationToken ct)
+    private async Task<string?> GetDockerHubTokenAsync(string repository, CancellationToken cancellationToken)
     {
         try
         {
             var tokenUrl = $"https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repository}:pull";
-            var response = await _registryClient.GetAsync(tokenUrl, ct);
+            var response = await _registryClient.GetAsync(tokenUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var tokenResponse = JsonSerializer.Deserialize<DockerAuthTokenResponse>(json, JsonOptions);
             return tokenResponse?.Token;
         }

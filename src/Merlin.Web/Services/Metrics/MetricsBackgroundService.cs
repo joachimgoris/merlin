@@ -21,7 +21,7 @@ public sealed class MetricsBackgroundService(
         try
         {
             await collector.CollectAsync(stoppingToken);
-            await processCollector.CollectAsync(ct: stoppingToken);
+            await processCollector.CollectAsync(cancellationToken: stoppingToken);
         }
         catch (Exception ex)
         {
@@ -39,7 +39,7 @@ public sealed class MetricsBackgroundService(
                 tickCount++;
                 if (tickCount % 3 == 0)
                 {
-                    var processes = await processCollector.CollectAsync(ct: stoppingToken);
+                    var processes = await processCollector.CollectAsync(cancellationToken: stoppingToken);
                     await hubContext.Clients.All.SendAsync("ProcessList", processes, stoppingToken);
                 }
             }

@@ -12,9 +12,9 @@ public sealed class ProcessCollector(
     private DateTimeOffset _lastCleanup = DateTimeOffset.UtcNow;
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromSeconds(30);
 
-    public async Task<IReadOnlyList<ProcessInfo>> CollectAsync(int topN = 25, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ProcessInfo>> CollectAsync(int topN = 25, CancellationToken cancellationToken = default)
     {
-        var totalMemoryBytes = await ReadTotalMemoryAsync(ct);
+        var totalMemoryBytes = await ReadTotalMemoryAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var activePids = new HashSet<int>();
         var processes = new List<ProcessInfo>();
@@ -40,7 +40,7 @@ public sealed class ProcessCollector(
 
             try
             {
-                var process = await ReadProcessAsync(pid, now, totalMemoryBytes, ct);
+                var process = await ReadProcessAsync(pid, now, totalMemoryBytes, cancellationToken);
                 if (process is not null)
                     processes.Add(process);
             }
@@ -63,15 +63,15 @@ public sealed class ProcessCollector(
         int pid,
         DateTimeOffset now,
         long totalMemoryBytes,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
         var statPath = Path.Combine(options.ProcPath, pid.ToString(), "stat");
         var statusPath = Path.Combine(options.ProcPath, pid.ToString(), "status");
 
-        var statLine = await File.ReadAllTextAsync(statPath, ct);
+        var statLine = await File.ReadAllTextAsync(statPath, cancellationToken);
         var (name, state, cpuTimeTicks) = ParseStatLine(statLine);
 
-        var (memoryBytes, uid) = await ReadStatusFileAsync(statusPath, ct);
+        var (memoryBytes, uid) = await ReadStatusFileAsync(statusPath, cancellationToken);
         var user = uid.ToString(CultureInfo.InvariantCulture);
 
         var cpuPercent = CalculateCpuPercent(pid, cpuTimeTicks, now);
@@ -132,12 +132,12 @@ public sealed class ProcessCollector(
         _ => code,
     };
 
-    private async Task<(long memoryBytes, int uid)> ReadStatusFileAsync(string path, CancellationToken ct)
+    private async Task<(long memoryBytes, int uid)> ReadStatusFileAsync(string path, CancellationToken cancellationToken)
     {
         long memoryBytes = 0;
         var uid = -1;
 
-        var lines = await File.ReadAllLinesAsync(path, ct);
+        var lines = await File.ReadAllLinesAsync(path, cancellationToken);
         foreach (var line in lines)
         {
             if (line.StartsWith("VmRSS:"))
@@ -182,11 +182,11 @@ public sealed class ProcessCollector(
         return Math.Clamp(percent, 0, 100 * Environment.ProcessorCount);
     }
 
-    private async Task<long> ReadTotalMemoryAsync(CancellationToken ct)
+    private async Task<long> ReadTotalMemoryAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "meminfo"), ct);
+            var lines = await File.ReadAllLinesAsync(Path.Combine(options.ProcPath, "meminfo"), cancellationToken);
             foreach (var line in lines)
             {
                 if (line.StartsWith("MemTotal:"))

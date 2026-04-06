@@ -49,11 +49,11 @@ public sealed class MetricsHub(
     public async IAsyncEnumerable<string> StreamContainerLogs(
         string containerId,
         int tail = 100,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         tail = Math.Clamp(tail, 1, 5000);
 
-        await foreach (var line in containerService.StreamLogsAsync(containerId, tail, ct))
+        await foreach (var line in containerService.StreamLogsAsync(containerId, tail, cancellationToken))
         {
             yield return line;
         }
