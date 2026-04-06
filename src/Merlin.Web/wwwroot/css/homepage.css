@@ -40,8 +40,8 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, oklch(75% 0.18 250), oklch(72% 0.2 310));
-  opacity: 0.6;
+  background: linear-gradient(90deg, #5b9cf5, #c084fc);
+  opacity: 0.7;
   transition: opacity 0.3s;
 }
 
