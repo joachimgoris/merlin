@@ -254,7 +254,9 @@ function openDrawer(container) {
   openContainerId = container.id;
   drawerName.textContent = container.name;
   drawerImage.textContent = container.image;
-  drawerImageId.textContent = container.imageId || '--';
+  drawerImageId.textContent = container.version
+    ? `${container.version} (${container.imageId || '?'})`
+    : container.imageId || '--';
   drawerStatus.textContent = container.status || '--';
   drawerCreated.textContent = container.created
     ? new Date(container.created).toLocaleString()

@@ -102,9 +102,11 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
                     ? c.ImageId[..12]
                     : c.ImageId ?? "";
 
+                var version = ExtractVersion(c.Labels, c.Image);
+
                 return new ContainerInfo(
-                    c.Id, name, c.Image ?? "unknown", imageId, c.Status ?? "unknown",
-                    c.State ?? "unknown", health, created, uptime);
+                    c.Id, name, c.Image ?? "unknown", imageId, version,
+                    c.Status ?? "unknown", c.State ?? "unknown", health, created, uptime);
             }).ToList();
         }
         catch (Exception ex)
@@ -315,6 +317,41 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         response.EnsureSuccessStatusCode();
     }
 
+    private static string ExtractVersion(Dictionary<string, string>? labels, string? image)
+    {
+        if (labels is not null)
+        {
+            // Try common version labels in priority order
+            string[] versionKeys =
+            [
+                "org.opencontainers.image.version",
+                "version",
+                "app.version",
+                "com.docker.compose.version",
+            ];
+
+            foreach (var key in versionKeys)
+            {
+                if (labels.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v))
+                    return v;
+            }
+        }
+
+        // Fall back to the image tag if it's not "latest"
+        if (image is not null)
+        {
+            var colonIdx = image.LastIndexOf(':');
+            if (colonIdx > 0)
+            {
+                var tag = image[(colonIdx + 1)..];
+                if (tag is not "latest" && !string.IsNullOrWhiteSpace(tag))
+                    return tag;
+            }
+        }
+
+        return "";
+    }
+
     public void Dispose()
     {
         _client.Dispose();
@@ -330,6 +367,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
         [JsonPropertyName("ImageID")]
         public string? ImageId { get; set; }
 
+        public Dictionary<string, string>? Labels { get; set; }
         public string? Status { get; set; }
         public string? State { get; set; }
         public long Created { get; set; }
