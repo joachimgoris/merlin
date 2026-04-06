@@ -1,5 +1,7 @@
 using Merlin.Web.Hubs;
+using Merlin.Web.Services.Alerts;
 using Merlin.Web.Services.Containers;
+using Merlin.Web.Services.Homepage;
 using Merlin.Web.Services.Metrics;
 using Merlin.Web.Services.Persistence;
 
@@ -41,6 +43,34 @@ builder.Services.AddHostedService<ContainerStatsBackgroundService>();
 builder.Services.AddSingleton<ImageUpdateChecker>();
 builder.Services.AddSingleton<ImageUpdateBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ImageUpdateBackgroundService>());
+
+// Alerts (Discord webhook)
+var discordWebhookUrl = builder.Configuration["MERLIN_DISCORD_WEBHOOK_URL"];
+if (!string.IsNullOrEmpty(discordWebhookUrl))
+{
+    var cpuThreshold = int.TryParse(builder.Configuration["MERLIN_ALERT_CPU_THRESHOLD"], out var ct) ? ct : 90;
+    var memThreshold = int.TryParse(builder.Configuration["MERLIN_ALERT_MEM_THRESHOLD"], out var mt) ? mt : 90;
+    var diskThreshold = int.TryParse(builder.Configuration["MERLIN_ALERT_DISK_THRESHOLD"], out var dt) ? dt : 95;
+    var cooldownMinutes = int.TryParse(builder.Configuration["MERLIN_ALERT_COOLDOWN_MINUTES"], out var cm) ? cm : 15;
+
+    var alertOptions = new AlertOptions(discordWebhookUrl, cpuThreshold, memThreshold, diskThreshold, cooldownMinutes);
+    builder.Services.AddSingleton(alertOptions);
+    builder.Services.AddSingleton<AlertEvaluator>();
+    builder.Services.AddHttpClient<DiscordWebhookClient>();
+    builder.Services.AddHostedService<AlertBackgroundService>();
+}
+
+// Homepage / Service catalog
+var homepageConfigPath = builder.Configuration["MERLIN_HOMEPAGE_CONFIG"] ?? "./data/homepage.json";
+builder.Services.AddSingleton(sp =>
+    new HomepageConfigLoader(homepageConfigPath, sp.GetRequiredService<ILogger<HomepageConfigLoader>>()));
+builder.Services.AddSingleton<ServiceDiscovery>();
+builder.Services.AddSingleton<ServiceStatusBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ServiceStatusBackgroundService>());
+builder.Services.AddHttpClient("HomepageHealthCheck", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // Persistence
 builder.Services.AddSingleton(new MetricsRepository(dbPath));
@@ -221,6 +251,11 @@ app.MapPost("/api/containers/{id}/restart", async (string id, IContainerService 
 {
     await containers.RestartAsync(id, ct);
     return Results.Ok();
+});
+
+app.MapGet("/api/homepage/services", (ServiceStatusBackgroundService homepageService) =>
+{
+    return Results.Ok(homepageService.CurrentServices);
 });
 
 app.Run();

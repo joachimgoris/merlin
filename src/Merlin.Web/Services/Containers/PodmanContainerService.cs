@@ -88,7 +88,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
             var json = await response.Content.ReadAsStringAsync(ct);
             var containers = JsonSerializer.Deserialize<List<PodmanContainer>>(json, JsonOptions) ?? [];
 
-            return containers.Select(c =>
+            return [.. containers.Select(c =>
             {
                 var name = c.Names?.FirstOrDefault()?.TrimStart('/')
                     ?? (c.Id.Length >= 12 ? c.Id[..12] : c.Id);
@@ -110,11 +110,16 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
                     ? proj
                     : "";
 
+                var homepageLabels = c.Labels?
+                    .Where(kv => kv.Key.StartsWith("merlin.homepage."))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value)
+                    ?? [];
+
                 return new ContainerInfo(
                     c.Id, name, c.Image ?? "unknown", imageId, version,
                     c.Status ?? "unknown", c.State ?? "unknown", health, created, uptime,
-                    null, null, composeProject);
-            }).ToList();
+                    null, null, composeProject, homepageLabels);
+            })];
         }
         catch (Exception ex)
         {
@@ -135,7 +140,7 @@ public sealed class PodmanContainerService : IContainerService, IDisposable
             var tasks = running.Select(c => GetContainerStatsAsync(c.Id, c.Name, ct));
             var results = await Task.WhenAll(tasks);
 
-            return results.Where(r => r is not null).Cast<ContainerStats>().ToList();
+            return [.. results.Where(r => r is not null).Cast<ContainerStats>()];
         }
         catch (Exception ex)
         {

@@ -13,4 +13,5 @@ public sealed record ContainerInfo(
     TimeSpan Uptime,
     string? HealthLog,
     DateTimeOffset? LastHealthCheck,
-    string ComposeProject);
+    string ComposeProject,
+    IReadOnlyDictionary<string, string> Labels);

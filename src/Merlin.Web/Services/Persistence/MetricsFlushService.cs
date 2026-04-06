@@ -42,7 +42,7 @@ public sealed class MetricsFlushService(
 
         var newEntries = latestStored.HasValue
             ? latest.Where(m => m.Timestamp > latestStored.Value).ToList()
-            : latest.ToList();
+            : [.. latest];
 
         if (newEntries.Count > 0)
         {

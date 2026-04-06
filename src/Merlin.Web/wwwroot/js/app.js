@@ -3,6 +3,7 @@ import * as anim from './animations.js';
 import { createSparkline, createAreaChart } from './charts.js';
 import { updateContainerList, updateContainerStats, updateContainerSparklines, updateImageUpdates } from './containers.js';
 import { initProcessList, updateProcessList } from './processes.js';
+import { initHomepage, updateHomepageServices, setHomepageVisible } from './homepage.js';
 
 // Threshold pulse tracking — only pulse once per crossing direction
 let cpuWasAboveThreshold = false;
@@ -221,6 +222,19 @@ async function main() {
   hub.onContainerSparklines(updateContainerSparklines);
   hub.onProcessList(updateProcessList);
   hub.onImageUpdates(updateImageUpdates);
+  hub.onHomepageServices(updateHomepageServices);
+
+  initHomepage();
+
+  // View toggle: homepage vs dashboard
+  const viewToggle = document.getElementById('view-toggle');
+  let homepageVisible = false;
+
+  viewToggle?.addEventListener('click', () => {
+    homepageVisible = !homepageVisible;
+    setHomepageVisible(homepageVisible);
+    viewToggle.textContent = homepageVisible ? 'Dashboard' : 'Homepage';
+  });
 
   await initProcessList();
 
@@ -270,6 +284,16 @@ async function main() {
     }
   } catch (e) {
     console.warn('Failed to load sparkline history:', e);
+  }
+
+  // Fetch initial homepage services
+  try {
+    const homepageRes = await fetch('/api/homepage/services');
+    if (homepageRes.ok) {
+      updateHomepageServices(await homepageRes.json());
+    }
+  } catch (e) {
+    console.warn('Failed to load homepage services:', e);
   }
 
   // Fetch initial image update status

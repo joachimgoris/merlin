@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
   <link rel="stylesheet" href="/css/toasts.css">
+  <link rel="stylesheet" href="/css/homepage.css">
 </head>
 <body>
   <header class="header">
@@ -27,6 +28,9 @@
         <circle cx="16" cy="14" r="2" fill="oklch(75% 0.18 250)"/>
       </svg>
       <h1 class="header__title">Merlin</h1>
+    </div>
+    <div class="header__actions">
+      <button class="btn btn--sm" id="view-toggle">Homepage</button>
     </div>
     <div class="header__status">
       <span class="connection-dot connection-dot--disconnected" id="connection-dot"></span>
@@ -42,6 +46,19 @@
     <span class="system-info-bar__item" id="sysinfo-cpu"></span>
     <span class="system-info-bar__item" id="sysinfo-ram"></span>
   </div>
+
+  <section class="homepage-section" id="homepage-section" hidden>
+    <div id="homepage-groups"></div>
+    <div class="empty-state" id="homepage-empty" style="display: none">
+      <svg class="empty-state__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="6" y="6" width="36" height="36" rx="4"/>
+        <line x1="6" y1="18" x2="42" y2="18"/>
+        <line x1="18" y1="18" x2="18" y2="42"/>
+      </svg>
+      <span class="empty-state__title">No services configured</span>
+      <span class="empty-state__description">Add merlin.homepage.* labels to containers or create a homepage.json config file.</span>
+    </div>
+  </section>
 
   <main>
     <!-- System metrics grid -->
@@ -279,6 +296,17 @@
         <canvas class="container-sparkline" data-sparkline="mem"></canvas>
       </div>
     </article>
+  </template>
+
+  <template id="homepage-group-template">
+    <div class="homepage-group" data-group="">
+      <button class="homepage-group__header" aria-expanded="true">
+        <span class="homepage-group__icon">&#x25BE;</span>
+        <span class="homepage-group__name"></span>
+        <span class="homepage-group__count"></span>
+      </button>
+      <div class="service-grid"></div>
+    </div>
   </template>
 
   <div id="toast-container" aria-live="polite"></div>

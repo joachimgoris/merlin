@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Merlin.Web.Models;
 
 namespace Merlin.Web.Services.Containers;
@@ -103,7 +102,7 @@ public sealed class ImageUpdateChecker : IDisposable
         return results.ToList();
     }
 
-    private async Task<ImageUpdateStatus> CheckSingleImageAsync(string imageReference, CancellationToken ct)
+    private async Task<ImageUpdateStatus> CheckSingleImageAsync(string imageReference, CancellationToken cancellationToken)
     {
         // Check cache first
         if (_cache.TryGetValue(imageReference, out var cached) &&
@@ -114,7 +113,7 @@ public sealed class ImageUpdateChecker : IDisposable
 
         try
         {
-            var localDigest = await GetLocalDigestAsync(imageReference, ct);
+            var localDigest = await GetLocalDigestAsync(imageReference, cancellationToken);
             if (string.IsNullOrEmpty(localDigest))
             {
                 var noDigestStatus = new ImageUpdateStatus(
@@ -125,7 +124,7 @@ public sealed class ImageUpdateChecker : IDisposable
             }
 
             var parsed = ParseImageReference(imageReference);
-            var remoteDigest = await GetRemoteDigestAsync(parsed, ct);
+            var remoteDigest = await GetRemoteDigestAsync(parsed, cancellationToken);
 
             var updateAvailable = !string.IsNullOrEmpty(remoteDigest)
                 && !string.IsNullOrEmpty(localDigest)
@@ -147,16 +146,16 @@ public sealed class ImageUpdateChecker : IDisposable
         }
     }
 
-    private async Task<string> GetLocalDigestAsync(string imageReference, CancellationToken ct)
+    private async Task<string> GetLocalDigestAsync(string imageReference, CancellationToken cancellationToken)
     {
         try
         {
             var encodedImage = Uri.EscapeDataString(imageReference);
             var response = await _podmanClient.GetAsync(
-                $"{PodmanApiBase}/images/{encodedImage}/json", ct);
+                $"{PodmanApiBase}/images/{encodedImage}/json", cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var imageInfo = JsonSerializer.Deserialize<PodmanImageInspect>(json, JsonOptions);
 
             // Try RepoDigests first — these contain the registry digest
@@ -187,7 +186,7 @@ public sealed class ImageUpdateChecker : IDisposable
         }
     }
 
-    private async Task<string?> GetRemoteDigestAsync(ParsedImageReference parsed, CancellationToken ct)
+    private async Task<string?> GetRemoteDigestAsync(ParsedImageReference parsed, CancellationToken cancellationToken)
     {
         try
         {
@@ -195,7 +194,7 @@ public sealed class ImageUpdateChecker : IDisposable
             string? authToken = null;
             if (parsed.Registry is "registry-1.docker.io")
             {
-                authToken = await GetDockerHubTokenAsync(parsed.Repository, ct);
+                authToken = await GetDockerHubTokenAsync(parsed.Repository, cancellationToken);
             }
 
             var manifestUrl = $"https://{parsed.Registry}/v2/{parsed.Repository}/manifests/{parsed.Tag}";
@@ -211,7 +210,7 @@ public sealed class ImageUpdateChecker : IDisposable
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
             }
 
-            using var response = await _registryClient.SendAsync(request, ct);
+            using var response = await _registryClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             if (response.Headers.TryGetValues("Docker-Content-Digest", out var digestValues))
@@ -327,4 +326,5 @@ public sealed class ImageUpdateChecker : IDisposable
     {
         public string? Token { get; set; }
     }
+
 }

@@ -10,6 +10,7 @@ const listeners = {
   ContainerSparklines: [],
   ProcessList: [],
   ImageUpdates: [],
+  HomepageServices: [],
 };
 
 connection.on('SystemMetrics', data => listeners.SystemMetrics.forEach(cb => cb(data)));
@@ -18,6 +19,7 @@ connection.on('ContainerStats', data => listeners.ContainerStats.forEach(cb => c
 connection.on('ContainerSparklines', data => listeners.ContainerSparklines.forEach(cb => cb(data)));
 connection.on('ProcessList', data => listeners.ProcessList.forEach(cb => cb(data)));
 connection.on('ImageUpdates', data => listeners.ImageUpdates.forEach(cb => cb(data)));
+connection.on('HomepageServices', data => listeners.HomepageServices.forEach(cb => cb(data)));
 
 const dot = document.getElementById('connection-dot');
 const text = document.getElementById('connection-text');
@@ -63,6 +65,7 @@ export function onContainerStats(cb) { listeners.ContainerStats.push(cb); }
 export function onContainerSparklines(cb) { listeners.ContainerSparklines.push(cb); }
 export function onProcessList(cb) { listeners.ProcessList.push(cb); }
 export function onImageUpdates(cb) { listeners.ImageUpdates.push(cb); }
+export function onHomepageServices(cb) { listeners.HomepageServices.push(cb); }
 
 export async function startContainer(id) { await connection.invoke('StartContainer', id); }
 export async function stopContainer(id) { await connection.invoke('StopContainer', id); }

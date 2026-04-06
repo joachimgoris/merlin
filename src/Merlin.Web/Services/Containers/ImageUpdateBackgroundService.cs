@@ -26,13 +26,13 @@ public sealed class ImageUpdateBackgroundService(
         await RunCheckAsync(ct);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("Image update check service started ({Interval} interval)", CheckInterval);
 
         try
         {
-            await Task.Delay(StartupDelay, stoppingToken);
+            await Task.Delay(StartupDelay, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -40,30 +40,30 @@ public sealed class ImageUpdateBackgroundService(
         }
 
         // Initial check
-        await RunCheckAsync(stoppingToken);
+        await RunCheckAsync(cancellationToken);
 
         // Check every 30s if containers changed (image pulled + recreated), full re-check every 15 min
         var lastFullCheck = DateTimeOffset.UtcNow;
         using var timer = new PeriodicTimer(ContainerChangeCheckInterval);
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        while (await timer.WaitForNextTickAsync(cancellationToken))
         {
             if (DateTimeOffset.UtcNow - lastFullCheck >= CheckInterval)
             {
-                await RunCheckAsync(stoppingToken);
+                await RunCheckAsync(cancellationToken);
                 lastFullCheck = DateTimeOffset.UtcNow;
             }
             else
             {
-                await CheckForContainerChangesAsync(stoppingToken);
+                await CheckForContainerChangesAsync(cancellationToken);
             }
         }
     }
 
-    private async Task CheckForContainerChangesAsync(CancellationToken ct)
+    private async Task CheckForContainerChangesAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var containers = await containerService.ListContainersAsync(ct);
+            var containers = await containerService.ListContainersAsync(cancellationToken);
             var changed = false;
 
             foreach (var c in containers.Where(c => c.State == "running"))
@@ -79,7 +79,7 @@ public sealed class ImageUpdateBackgroundService(
             {
                 logger.LogInformation("Container image change detected, re-checking updates");
                 updateChecker.ClearCache();
-                await RunCheckAsync(ct);
+                await RunCheckAsync(cancellationToken);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
